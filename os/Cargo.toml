@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.17"
 qemu-exit = "3.0.1"
+riscv = "0.10.1"
 
 [profile.release]
 debug = true

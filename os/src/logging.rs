@@ -1,4 +1,3 @@
-use crate::println;
 use log::Log;
 use log::{Level, LevelFilter};
 use log::{Metadata, Record};
