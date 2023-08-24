@@ -1,0 +1,25 @@
+[package]
+name = "os"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+buddy_system_allocator = "0.9.0"
+enumflags2 = "0.7.7"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+log = "0.4.19"
+riscv = "0.10.1"
+sbi-rt = { version = "0.0.2", features = ["legacy"] }
+easy-fs = { path = "../easy-fs" }
+
+[dependencies.goblin]
+version = "0.6.1"
+default-features = false
+features = ["elf64", "elf32", "endian_fd"]
+
+[dependencies.virtio-drivers]
+git = "https://github.com/rcore-os/virtio-drivers"
+branch = "rcore-tutorial"
+
+[profile.release]
+debug = true
