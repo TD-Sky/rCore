@@ -1,6 +1,7 @@
-use crate::{read, write};
 use core::fmt;
 use core::fmt::Write;
+
+use crate::io::{read, write};
 
 const STDIN: usize = 0;
 const STDOUT: usize = 1;
@@ -20,15 +21,15 @@ pub fn print(args: fmt::Arguments) {
 
 #[macro_export]
 macro_rules! print {
-    ($fmt: literal $(, $($arg:tt)+)?) => {
-        $crate::console::print(format_args!($fmt $(, $($arg)+)?))
+    ($($arg:tt)*) => {
+        $crate::console::print(format_args!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! println {
-    ($fmt: literal $(, $($arg:tt)+)?) => {
-        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?))
+    ($($arg:tt)*) => {
+        $crate::console::print(format_args_nl!($($arg)*))
     };
 }
 

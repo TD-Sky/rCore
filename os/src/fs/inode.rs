@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
-
 use alloc::vec::Vec;
+
 use easy_fs::EasyFileSystem;
 use easy_fs::Inode;
 use easy_fs::Stat;
@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use super::File;
 use crate::drivers::BLOCK_DEVICE;
-use crate::memory::Buffer;
+use crate::memory::UserBuffer;
 use crate::sync::UPSafeCell;
 
 lazy_static! {
@@ -27,14 +27,6 @@ pub struct OSInode {
     inner: UPSafeCell<OSInodeInner>,
 }
 
-pub fn list_apps() {
-    println!("/**** APPS ****/");
-    for app in ROOT_INODE.ls() {
-        println!("{}", app);
-    }
-    println!("/**************/");
-}
-
 pub fn open_file(name: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
     let [readable, writable] = if flags.is_empty() {
         [true, false]
@@ -44,6 +36,14 @@ pub fn open_file(name: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> 
         [true, true]
     };
     let create = flags.contains(OpenFlag::CREATE);
+
+    if name == "/" {
+        return Some(Arc::new(OSInode::new(
+            readable,
+            writable,
+            ROOT_INODE.clone(),
+        )));
+    }
 
     ROOT_INODE
         .find(name)
@@ -74,7 +74,6 @@ pub fn unlink_at(path: &str) -> Option<()> {
     ROOT_INODE.unlink_at(path)
 }
 
-
 struct OSInodeInner {
     /// **文件**内的偏移量
     offset: usize,
@@ -101,6 +100,11 @@ impl OpenFlag {
     // enumflags2拒绝值为0的标志
     /// 只读
     pub const RDONLY: u32 = 0b0000_0000_0000;
+
+    #[inline]
+    pub fn read_only() -> BitFlags<OpenFlag> {
+        BitFlags::from_bits_truncate(Self::RDONLY)
+    }
 }
 
 impl OSInode {
@@ -141,7 +145,7 @@ impl File for OSInode {
         self.writable
     }
 
-    fn read(&self, mut buf: Buffer) -> usize {
+    fn read(&self, mut buf: UserBuffer) -> usize {
         let mut inner = self.inner.exclusive_access();
         let mut total_read_size = 0;
 
@@ -157,7 +161,7 @@ impl File for OSInode {
         total_read_size
     }
 
-    fn write(&self, buf: Buffer) -> usize {
+    fn write(&self, buf: UserBuffer) -> usize {
         let mut inner = self.inner.exclusive_access();
         let mut total_write_size = 0;
 
@@ -172,7 +176,6 @@ impl File for OSInode {
     }
 
     fn stat(&self) -> Stat {
-        let inner = self.inner.exclusive_access();
-        inner.inode.stat()
+        self.inner.exclusive_access().inode.stat()
     }
 }

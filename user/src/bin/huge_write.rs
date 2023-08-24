@@ -1,13 +1,12 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::close;
-use user::get_time;
-use user::write;
-use user::{open, OpenFlag};
+use user::fs::{close, open, OpenFlag};
+use user::io::write;
+use user::time::get_time;
 
 #[no_mangle]
 pub fn main() -> i32 {

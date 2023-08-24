@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
-use user::{spawn, waitpid};
+use user::process::{spawn, waitpid};
 
 #[macro_use]
 extern crate user;

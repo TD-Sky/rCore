@@ -1,5 +1,8 @@
 use core::panic::PanicInfo;
 
+use crate::process::getpid;
+use crate::signal::{kill, SIGABRT};
+
 // 真崩溃的话，内核都管不了
 #[panic_handler]
 fn panic_handler(panic_info: &PanicInfo) -> ! {
@@ -16,5 +19,6 @@ fn panic_handler(panic_info: &PanicInfo) -> ! {
         println!("Panicked: {}", err);
     }
 
-    loop {}
+    kill(getpid(), SIGABRT);
+    unreachable!()
 }

@@ -1,3 +1,7 @@
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use super::address::PhysAddr;
 use super::address::PhysPageNum;
 use super::address::VirtAddr;
@@ -5,9 +9,6 @@ use super::address::VirtPageNum;
 use super::frame_allocator;
 use super::frame_allocator::Frame;
 
-use alloc::string::String;
-use alloc::vec;
-use alloc::vec::Vec;
 use enumflags2::bitflags;
 use enumflags2::BitFlags;
 
@@ -104,6 +105,7 @@ impl PageTable {
     }
 
     /// 凭借虚拟页号访问页表项
+    #[inline]
     pub fn translate(&self, vpn: VirtPageNum) -> Option<&Entry> {
         self.get_mut(vpn).map(|e| &*e)
     }
@@ -173,6 +175,16 @@ impl PageTable {
 
         Some(&mut ppn.ptes_mut()[indexes[2]])
     }
+
+    #[inline]
+    fn read_ref<T>(&self, va: VirtAddr) -> &'static T {
+        self.translate_virt_addr(va).unwrap().as_ref()
+    }
+
+    #[inline]
+    fn read_mut<T>(&mut self, va: VirtAddr) -> &'static mut T {
+        self.translate_virt_addr(va).unwrap().as_mut()
+    }
 }
 
 impl Entry {
@@ -198,44 +210,19 @@ impl Entry {
     }
 }
 
-/// 翻译虚拟内存的指针，集合来自不同物理页的字节流以组成连续的字节流
-pub fn read_bytes(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
-    let page_table = PageTable::from_token(token);
-    let mut start = ptr as usize;
-    let end = start + len;
-    let mut bytes = vec![];
 
-    while start < end {
-        let start_va = VirtAddr::from(start);
-        let vpn = start_va.page_number();
-        let ppn = page_table.translate(vpn).unwrap().ppn();
-        let end_va = VirtAddr::from(end).min(VirtAddr::from(vpn + 1));
 
-        if end_va.page_offset() == 0 {
-            // 跨页了，先读完当前页所有
-            bytes.push(&mut ppn.page_bytes_mut()[start_va.page_offset()..]);
-        } else {
-            // 同一页内
-            bytes.push(&mut ppn.page_bytes_mut()[start_va.page_offset()..end_va.page_offset()]);
-        }
-
-        start = end_va.into();
-    }
-
-    bytes
-}
-
-pub fn read_str(token: usize, ptr: *const u8) -> String {
+pub fn read_str(token: usize, src: *const u8) -> String {
     let page_table = PageTable::from_token(token);
     let mut string = String::new();
-    let mut va = ptr as usize;
+    let mut src = src as usize;
 
     loop {
-        let ch: u8 = *(page_table.translate_virt_addr(va.into()).unwrap().as_mut());
+        let ch: u8 = *(page_table.read_ref(src.into()));
 
         if ch != b'\0' {
             string.push(ch as char);
-            va += 1;
+            src += 1;
         } else {
             break;
         }
@@ -244,9 +231,21 @@ pub fn read_str(token: usize, ptr: *const u8) -> String {
     string
 }
 
-pub fn read_mut<T>(token: usize, ptr: *mut T) -> &'static mut T {
-    let page_table = PageTable::from_token(token);
-    let va = ptr as usize;
+pub fn write_str(token: usize, src: &str, dest: *mut u8) {
+    let mut page_table = PageTable::from_token(token);
+    let mut dest = dest as usize;
 
-    page_table.translate_virt_addr(va.into()).unwrap().as_mut()
+    for &byte in src.as_bytes() {
+        *page_table.read_mut(dest.into()) = byte;
+        dest += 1;
+    }
+    *page_table.read_mut(dest.into()) = b'\0';
+}
+
+pub fn read_ref<T>(token: usize, ptr: *const T) -> &'static T {
+    PageTable::from_token(token).read_ref((ptr as usize).into())
+}
+
+pub fn read_mut<T>(token: usize, ptr: *mut T) -> &'static mut T {
+    PageTable::from_token(token).read_mut((ptr as usize).into())
 }

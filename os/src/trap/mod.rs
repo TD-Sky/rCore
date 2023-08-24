@@ -32,6 +32,7 @@ use crate::config::TRAP_CONTEXT;
 use crate::syscall::syscall;
 use crate::task;
 use crate::task::processor;
+use crate::task::signal::SignalFlag;
 use crate::task::switch::update_switch_time;
 use crate::timer;
 
@@ -87,32 +88,28 @@ pub fn trap_handler() -> ! {
             // 希望 sepc 可以指向 ecall 的下一条指令
             // (RISC-V 64 指令长度不超过 32 位)
             ctx.sepc += 4;
-            let result = syscall(ctx.a(7), [ctx.a(0), ctx.a(1), ctx.a(2)]);
+            let result = syscall(ctx.arg(7), [ctx.arg(0), ctx.arg(1), ctx.arg(2)]);
 
             // 原来的Trap上下文在 sys_exec 时被回收，需获取新的Trap上下文
             let ctx = processor::current_trap_ctx();
-            ctx.set_a0(result as usize);
+            ctx.set_syscall_result(result as usize);
         }
 
+        // 某些异常会令内核给进程发送信号，
+        // 这就是异步信号的由来，即异步异常的传染
         Trap::Exception(
-            fault @ (Exception::StoreFault
+            Exception::StoreFault
             | Exception::StorePageFault
             | Exception::LoadFault
-            | Exception::LoadPageFault),
+            | Exception::LoadPageFault
+            | Exception::InstructionFault
+            | Exception::InstructionPageFault,
         ) => {
-            println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
-                fault,stval,
-                processor::current_trap_ctx().sepc,
-            );
-            // page fault exit code
-            task::exit_current_and_run_next(-2);
+            task::send_signal_to_current(SignalFlag::SIGSEGV);
         }
 
         Trap::Exception(Exception::IllegalInstruction) => {
-            println!("[kernel] IllegalInstruction in application, kernel killed it.");
-            // illegal instruction exit code
-            task::exit_current_and_run_next(-3);
+            task::send_signal_to_current(SignalFlag::SIGILL);
         }
 
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
@@ -125,6 +122,13 @@ pub fn trap_handler() -> ! {
             scause.cause(),
             stval
         ),
+    }
+
+    task::handle_signals();
+
+    if let Some((errno, msg)) = task::check_current_signal_error() {
+        log::error!("[kernel] {msg}");
+        task::exit_current_and_run_next(errno);
     }
 
     task::user_time_start();

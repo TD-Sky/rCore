@@ -1,20 +1,18 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::exit;
-use user::fork;
-use user::yield_;
-use user::{wait, waitpid};
+use user::process::{exit, fork, wait, waitpid};
+use user::thread::yield_;
 
 const MAGIC: i32 = -0x10384;
 
 #[no_mangle]
 pub fn main() -> i32 {
     println!("I am the parent. Forking the child...");
-    let pid = fork().unwrap();
+    let pid = fork();
     if pid == 0 {
         println!("I am the child.");
         for _ in 0..7 {

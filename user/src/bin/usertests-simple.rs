@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
-#[macro_use]
-extern crate user;
+use core::ptr;
+
+use user::println;
+use user::process::{exec, fork, waitpid};
 
 static TESTS: &[&str] = &[
     "exit\0",
@@ -18,17 +21,13 @@ static TESTS: &[&str] = &[
     "yield\0",
 ];
 
-use user::exec;
-use user::fork;
-use user::waitpid;
-
 #[no_mangle]
 pub fn main() -> i32 {
     for test in TESTS {
-        println!("Usertests: Running {}", test);
-        let pid = fork().unwrap();
+        println!("Usertests: Running {test}");
+        let pid = fork();
         if pid == 0 {
-            exec(test);
+            exec(test, &[ptr::null()]);
             panic!("unreachable!");
         } else {
             let mut exit_code: i32 = Default::default();

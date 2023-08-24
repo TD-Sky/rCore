@@ -1,16 +1,13 @@
 #![no_std]
 #![no_main]
 #![allow(clippy::needless_range_loop)]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::exit;
-use user::fork;
-use user::get_time;
-use user::getpid;
-use user::wait;
-use user::yield_;
+use user::process::{exit, fork, getpid, wait};
+use user::thread::yield_;
+use user::time::get_time;
 
 static NUM: usize = 30;
 const N: usize = 10;
@@ -53,7 +50,7 @@ fn work(times: isize) {
 #[no_mangle]
 pub fn main() -> i32 {
     for _ in 0..NUM {
-        let pid = fork().unwrap();
+        let pid = fork();
         if pid == 0 {
             let current_time = get_time();
             let times = (current_time as i32 as isize) * (current_time as i32 as isize) % 1000;

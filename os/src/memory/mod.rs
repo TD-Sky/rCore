@@ -11,10 +11,10 @@ mod heap_allocator;
 
 mod page_table;
 pub use page_table::PageTable;
-pub use page_table::{read_bytes, read_mut, read_str};
+pub use page_table::{read_mut, read_ref, read_str, write_str};
 
 mod buffer;
-pub use buffer::Buffer;
+pub use buffer::UserBuffer;
 
 pub fn init() {
     heap_allocator::init();

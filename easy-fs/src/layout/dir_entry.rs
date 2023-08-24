@@ -3,7 +3,7 @@ use core::slice;
 const NAME_MAX_LEN: usize = 27;
 
 /// 文件系统项的元信息
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[repr(C)]
 pub struct DirEntry {
     // 最后一字节留给 \0
@@ -44,4 +44,3 @@ impl DirEntry {
         unsafe { slice::from_raw_parts_mut(self as *mut Self as usize as *mut u8, Self::SIZE) }
     }
 }
-

@@ -3,7 +3,6 @@
 //! 位于内存的虚拟文件系统，确立了文件系统的操作逻辑：
 //! 通过多个 [`Inode`] 形成文件树。
 
-use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -26,7 +25,7 @@ pub struct Inode {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Stat {
     pub dev: u64,
     pub inode: u64,
@@ -38,9 +37,10 @@ pub struct Stat {
 #[allow(clippy::upper_case_acronyms)]
 #[bitflags]
 #[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum StatKind {
     DIR = 0o040000,
+    #[default]
     FILE = 0o100000,
 }
 
@@ -93,28 +93,6 @@ impl Inode {
             self.fs.clone(),
             self.block_device.clone(),
         )))
-    }
-
-    pub fn ls(&self) -> Vec<String> {
-        // 锁住efs以避免其它核同时访问造成冲突
-        let _fs = self.fs.lock();
-        self.on_disk(|disk_inode| {
-            let files = disk_inode.size as usize / DirEntry::SIZE;
-            (0..files)
-                .map(|i| {
-                    let mut dir_entry = DirEntry::default();
-                    assert_eq!(
-                        disk_inode.read_at(
-                            i * DirEntry::SIZE,
-                            dir_entry.as_bytes_mut(),
-                            &self.block_device
-                        ),
-                        DirEntry::SIZE
-                    );
-                    String::from(dir_entry.name())
-                })
-                .collect()
-        })
     }
 
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {

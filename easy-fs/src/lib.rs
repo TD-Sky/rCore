@@ -16,6 +16,7 @@ pub use efs::EasyFileSystem;
 
 // 磁盘数据结构层：表示磁盘文件系统的数据结构
 mod layout;
+pub use layout::DirEntry;
 
 // 块缓存层：内存上的磁盘块数据缓存
 mod block_cache;

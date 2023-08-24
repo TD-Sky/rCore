@@ -1,14 +1,11 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::exit;
-use user::fork;
-use user::getpid;
-use user::sleep;
-use user::yield_;
+use user::process::{exit, fork, getpid};
+use user::thread::{sleep, yield_};
 
 const DEPTH: usize = 4;
 
@@ -20,7 +17,7 @@ fn fork_child(cur: &str, branch: char) {
     }
     next[..l].copy_from_slice(cur.as_bytes());
     next[l] = branch as u8;
-    if fork().unwrap() == 0 {
+    if fork() == 0 {
         fork_tree(core::str::from_utf8(&next[..l + 1]).unwrap());
         yield_();
         exit(0);

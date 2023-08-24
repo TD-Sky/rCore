@@ -152,6 +152,10 @@ impl PhysAddr {
         PhysPageNum((self.0 - 1 + PAGE_SIZE) / PAGE_SIZE)
     }
 
+    pub fn as_ref<T>(self) -> &'static T {
+        unsafe { (self.0 as *const T).as_ref().unwrap() }
+    }
+
     pub fn as_mut<T>(self) -> &'static mut T {
         unsafe { (self.0 as *mut T).as_mut().unwrap() }
     }
@@ -283,7 +287,6 @@ impl Add<usize> for PhysAddr {
         Self::from(self.0 + rhs)
     }
 }
-
 
 // ========== PhysPageNum * usize ==========
 

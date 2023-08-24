@@ -12,7 +12,7 @@ fn panic(info: &PanicInfo) -> ! {
             msg
         );
     } else {
-        println!("Panicked: {}", msg);
+        println!("Panicked: {msg}");
     }
 
     // unsafe { print_stack_trace(); }

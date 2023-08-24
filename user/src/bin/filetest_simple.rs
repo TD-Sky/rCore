@@ -1,14 +1,13 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
 
 use enumflags2::BitFlags;
-use user::close;
-use user::read;
-use user::write;
-use user::{open, OpenFlag};
+use user::fs::{close, open, OpenFlag};
+use user::io::{read, write};
 
 #[no_mangle]
 pub fn main() -> i32 {

@@ -3,6 +3,7 @@
 #![no_std]
 #![no_main]
 #![allow(clippy::invalid_null_ptr_usage)]
+#![feature(format_args_nl)]
 
 use core::ptr::null;
 use user::println;

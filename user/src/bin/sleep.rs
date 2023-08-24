@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
 
-use user::{exit, fork, get_time, sleep, waitpid};
+use user::process::{exit, fork, waitpid};
+use user::thread::sleep;
+use user::time::get_time;
 
 fn sleepy() {
     let time: usize = 100;
@@ -18,7 +21,7 @@ fn sleepy() {
 #[no_mangle]
 pub fn main() -> i32 {
     let current_time = get_time();
-    let pid = fork().unwrap();
+    let pid = fork();
     let mut exit_code: i32 = 0;
     if pid == 0 {
         sleepy();

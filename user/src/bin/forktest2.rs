@@ -1,17 +1,19 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::{exit, fork, get_time, getpid, sleep, wait};
+use user::process::*;
+use user::thread::sleep;
+use user::time::get_time;
 
 static NUM: usize = 30;
 
 #[no_mangle]
 pub fn main() -> i32 {
     for _ in 0..NUM {
-        let pid = fork().unwrap();
+        let pid = fork();
         if pid == 0 {
             let current_time = get_time();
             let sleep_length =

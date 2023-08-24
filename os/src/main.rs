@@ -5,6 +5,8 @@
 #![feature(slice_from_ptr_range)]
 #![feature(const_trait_impl)]
 #![feature(step_trait)]
+#![feature(format_args_nl)]
+#![feature(riscv_ext_intrinsics)]
 
 extern crate alloc;
 
@@ -32,8 +34,6 @@ mod board;
 use core::arch::global_asm;
 use core::slice;
 
-use crate::fs::list_apps;
-
 global_asm!(include_str!("entry.asm"));
 
 extern "C" {
@@ -57,7 +57,6 @@ pub fn rust_main() -> ! {
     trap::init(); // 设置好 Trap 处理入口
     trap::enable_timer_interrupt();
     timer::set_next_trigger(); // 开始定时
-    list_apps();
     task::run();
 
     unreachable!()

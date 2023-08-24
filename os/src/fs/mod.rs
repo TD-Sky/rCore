@@ -14,18 +14,21 @@
 //! 表中的描述符表示带有特定读写属性的I/O资源(文件/目录/socket等)。
 
 mod inode;
-use easy_fs::Stat;
 pub use inode::*;
+
+mod pipe;
+pub use pipe::{Pipe, PipeRingBuffer};
 
 pub mod stdio;
 
-use crate::memory::Buffer;
+use crate::memory::UserBuffer;
+use easy_fs::Stat;
 
 /// 内存与存储设备之间的数据交换通道
 pub trait File: Send + Sync {
     fn readable(&self) -> bool;
     fn writable(&self) -> bool;
-    fn read(&self, buf: Buffer) -> usize;
-    fn write(&self, buf: Buffer) -> usize;
+    fn read(&self, buf: UserBuffer) -> usize;
+    fn write(&self, buf: UserBuffer) -> usize;
     fn stat(&self) -> Stat;
 }

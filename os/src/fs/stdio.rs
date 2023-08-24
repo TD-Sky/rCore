@@ -1,7 +1,7 @@
 use easy_fs::Stat;
 
 use super::File;
-use crate::memory::Buffer;
+use crate::memory::UserBuffer;
 use crate::sbi::console_getchar;
 use crate::task;
 
@@ -22,7 +22,7 @@ impl File for Stdin {
         false
     }
 
-    fn read(&self, mut buf: Buffer) -> usize {
+    fn read(&self, mut buf: UserBuffer) -> usize {
         assert_eq!(buf.len(), 1);
         let mut c: usize;
         loop {
@@ -41,14 +41,12 @@ impl File for Stdin {
         1
     }
 
-    #[inline]
-    fn write(&self, _buf: Buffer) -> usize {
-        panic!("cannot write to stdin!");
+    fn write(&self, _buf: UserBuffer) -> usize {
+        unimplemented!()
     }
 
-    #[inline]
     fn stat(&self) -> Stat {
-        panic!("stdin has no stat!");
+        unimplemented!()
     }
 }
 
@@ -64,11 +62,11 @@ impl File for Stdout {
     }
 
     #[inline]
-    fn read(&self, _buf: Buffer) -> usize {
-        panic!("cannot read from stdout!");
+    fn read(&self, _buf: UserBuffer) -> usize {
+        unimplemented!()
     }
 
-    fn write(&self, buf: Buffer) -> usize {
+    fn write(&self, buf: UserBuffer) -> usize {
         for sub_buf in buf.as_ref() {
             print!("{}", core::str::from_utf8(sub_buf).unwrap());
         }
@@ -77,6 +75,6 @@ impl File for Stdout {
 
     #[inline]
     fn stat(&self) -> Stat {
-        panic!("stdout has no stat!");
+        unimplemented!()
     }
 }

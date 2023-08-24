@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::{fork, getpid, wait};
+use user::process::{fork, getpid, wait};
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -12,7 +12,7 @@ pub fn main() -> i32 {
     println!("sys_wait without child process test passed!");
     println!("parent start, pid = {}!", getpid());
 
-    let pid = fork().unwrap();
+    let pid = fork();
     if pid == 0 {
         // child process
         println!("hello child process!");

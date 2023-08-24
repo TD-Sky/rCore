@@ -1,15 +1,18 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
+
+use core::ptr;
 
 use user::println;
-use user::yield_;
-use user::{exec, fork, wait};
+use user::process::{exec, fork, wait};
+use user::thread::yield_;
 
 #[no_mangle]
 fn main() -> i32 {
-    if fork().unwrap() == 0 {
+    if fork() == 0 {
         // 启动shell
-        exec("user_shell\0");
+        exec("user_shell\0", &[ptr::null()]);
     } else {
         loop {
             let mut exit_code = 0;
@@ -20,8 +23,7 @@ fn main() -> i32 {
                 }
                 Some(pid) => {
                     println!(
-                        "[initproc] Released a zombie process, pid={}, exit_code={}",
-                        pid, exit_code
+                        "[initproc] Released a zombie process, pid={pid}, exit_code={exit_code}",
                     );
                 }
             }

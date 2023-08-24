@@ -20,6 +20,7 @@ use riscv::register::sstatus::SPP;
 // |     x1        |
 // |     x0        |
 #[repr(C)]
+#[derive(Clone)]
 pub struct TrapContext {
     /// 所有通用寄存器，x0 ~ x31
     x: [usize; 32],
@@ -75,12 +76,23 @@ impl TrapContext {
     }
 
     /// 凭借ABI索引访问参数寄存器
-    pub fn a(&self, n: usize) -> usize {
+    #[inline]
+    pub fn arg(&self, n: usize) -> usize {
         self.x[n + 10]
     }
 
+    #[inline]
+    pub fn arg_mut(&mut self, n: usize) -> &mut usize {
+        &mut self.x[n + 10]
+    }
+
     /// 设置系统调用的结果
-    pub fn set_a0(&mut self, a0: usize) {
-        self.x[10] = a0;
+    pub fn set_syscall_result(&mut self, res: usize) {
+        self.x[10] = res;
+    }
+
+    #[inline]
+    pub fn set_sepc(&mut self, sepc: usize) {
+        self.sepc = sepc;
     }
 }

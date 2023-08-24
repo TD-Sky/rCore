@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::getpid;
+use user::process::getpid;
 
 #[no_mangle]
 pub fn main() -> i32 {

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 use user::println;
 

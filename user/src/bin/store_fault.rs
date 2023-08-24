@@ -2,6 +2,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 use core::ptr::null_mut;
 use user::println;

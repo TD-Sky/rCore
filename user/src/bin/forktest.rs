@@ -1,19 +1,17 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 #[macro_use]
 extern crate user;
-
-use user::exit;
-use user::fork;
-use user::wait;
+use user::process::{exit, fork, wait};
 
 const MAX_CHILD: usize = 30;
 
 #[no_mangle]
 pub fn main() -> i32 {
     for i in 0..MAX_CHILD {
-        let pid = fork().unwrap();
+        let pid = fork();
         if pid == 0 {
             println!("I am child {}", i);
             exit(0);

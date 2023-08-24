@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
-#[macro_use]
-extern crate user;
-
-use user::get_time;
-use user::sleep;
+use user::println;
+use user::thread::sleep;
+use user::time::get_time;
 
 #[no_mangle]
 pub fn main() -> i32 {

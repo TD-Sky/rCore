@@ -1,9 +1,10 @@
 #![no_std]
 #![no_main]
+#![feature(format_args_nl)]
 
 use core::ptr::null;
+use user::mem::{mmap, munmap, ProtectFlag};
 use user::println;
-use user::{mmap, munmap, ProtectFlag};
 
 #[no_mangle]
 fn main() -> i32 {

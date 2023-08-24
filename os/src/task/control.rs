@@ -1,24 +1,28 @@
-use core::cmp::Ordering;
-
+use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use core::cmp::Ordering;
+use core::mem;
+
 use enumflags2::BitFlags;
+use log::info;
 
 use crate::config::{MMAP_OFFSET_FROM, PAGE_SIZE, TRAP_CONTEXT};
+use crate::fs::stdio::*;
 use crate::fs::File;
-use crate::fs::{stdio::*, OSInode};
 use crate::memory::address::{PhysPageNum, VirtAddr};
 use crate::memory::kernel_stack::KernelStack;
-use crate::memory::{AddressSpace, KERNEL_SPACE};
+use crate::memory::{self, AddressSpace, KERNEL_SPACE};
 use crate::stopwatch;
 use crate::sync::UPSafeCell;
 use crate::trap::trap_handler;
 use crate::trap::TrapContext;
 
-use super::pid;
+use super::signal::{SignalAction, SignalFlag};
 use super::PidHandle;
 use super::TaskContext;
+use super::{pid, signal};
 
 pub struct TaskControlBlock {
     pid: PidHandle,
@@ -29,10 +33,10 @@ pub struct TaskControlBlock {
 pub struct TaskControlBlockInner {
     // 进程
     pub(super) task_status: TaskStatus,
-    pub(super) parent: Option<Weak<TaskControlBlock>>,
+    pub parent: Option<Weak<TaskControlBlock>>,
     /// 子进程，当前进程结束时，它们将被移交给 initproc
-    pub(super) children: Vec<Arc<TaskControlBlock>>,
-    exit_code: i32,
+    pub children: Vec<Arc<TaskControlBlock>>,
+    pub exit_code: i32,
     // 内存
     pub(super) task_ctx: TaskContext,
     address_space: AddressSpace,
@@ -44,7 +48,15 @@ pub struct TaskControlBlockInner {
     program_brk: usize,
     /// **文件描述符表**
     // Option 表示文件描述符是否指示着文件
-    fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    // 信号
+    pub signals: BitFlags<SignalFlag>,
+    pub signal_mask: BitFlags<SignalFlag>,
+    pub handling_signal: Option<u32>,
+    pub sigactions: [SignalAction; signal::COUNT],
+    pub(super) killed: bool,
+    pub(super) frozen: bool,
+    pub trap_ctx_backup: Option<TrapContext>,
     // 计时
     pub(super) user_time: usize,
     pub(super) kernel_time: usize,
@@ -94,8 +106,6 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     mmap_bottom: user_sp + MMAP_OFFSET_FROM,
                     program_brk: user_sp,
-                    user_time: 0,
-                    kernel_time: 0,
                     fd_table: vec![
                         // 0 -> stdin
                         Some(Arc::new(Stdin)),
@@ -104,6 +114,15 @@ impl TaskControlBlock {
                         // 2 -> stderr
                         Some(Arc::new(Stdout)),
                     ],
+                    signals: BitFlags::empty(),
+                    signal_mask: BitFlags::empty(),
+                    handling_signal: None,
+                    sigactions: Default::default(),
+                    killed: false,
+                    frozen: false,
+                    trap_ctx_backup: None,
+                    user_time: 0,
+                    kernel_time: 0,
                 })
             },
         }
@@ -149,9 +168,16 @@ impl TaskControlBlock {
                     heap_bottom: parent_inner.heap_bottom,
                     mmap_bottom: parent_inner.mmap_bottom,
                     program_brk: parent_inner.program_brk,
+                    fd_table: parent_inner.fd_table.clone(),
+                    signals: BitFlags::empty(),
+                    signal_mask: parent_inner.signal_mask,
+                    handling_signal: None,
+                    sigactions: parent_inner.sigactions.clone(),
+                    killed: false,
+                    frozen: false,
+                    trap_ctx_backup: None,
                     user_time: parent_inner.user_time,
                     kernel_time: parent_inner.kernel_time,
-                    fd_table: parent_inner.fd_table.clone(),
                 })
             },
         });
@@ -161,8 +187,61 @@ impl TaskControlBlock {
         tcb
     }
 
-    pub fn exec(&self, elf_data: &[u8]) {
-        let (addr_space, user_sp, entry_point) = AddressSpace::new_user(elf_data);
+    pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
+        let (addr_space, mut user_sp, entry_point) = AddressSpace::new_user(elf_data);
+
+        let token = addr_space.token();
+        info!("token={token:#x} original user_sp={user_sp:#x}");
+        let argc = args.len();
+        // 预备参数的栈空间
+        user_sp -= (argc + 1) * mem::size_of::<usize>();
+        let argv_base = user_sp;
+        info!("token={token:#x} argv_base={argv_base:#x}");
+        // 参数指针列表，指向用户栈，起始于`argv_base`，
+        // 多拾取一个槽位用于放置空指针作为列表终止符
+        let mut argv: Vec<&'static mut usize> = (0..=argc)
+            .map(|i| {
+                memory::read_mut(
+                    token,
+                    (argv_base + i * mem::size_of::<usize>()) as *mut usize,
+                )
+            })
+            .collect();
+        for (arg, ptr) in args.iter().zip(&mut argv[..argc]) {
+            // 压栈
+            user_sp -= arg.len() + 1;
+            // 第一次解指针跨越了Vec
+            **ptr = user_sp;
+            info!("token={token:#x} arg_addr={ptr:#x}");
+            // 将参数写入参数指针所指之处
+            memory::write_str(token, arg, **ptr as *mut u8);
+        }
+        *argv[argc] = 0;
+        // make the user_sp aligned to 8B for k210 platform
+        user_sp -= user_sp % mem::size_of::<usize>();
+        info!("token={token:#x} align_at={user_sp:#x}");
+        /*
+         * 参数栈空间
+         *
+         *              HighAddr
+         *            |    0    |
+         *            | argv[n] |
+         *            |  ....   |
+         *            | argv[1] |
+         *            | argv[0] |
+         *            ----------- <- argv_base
+         *            |  '\0'   |
+         *            |  '\a'   |
+         *            |  '\a'   |
+         * argv[0] -> -----------
+         *            |  '\0'   |
+         *            |  '\b'   |
+         * argv[1] -> -----------
+         *            |  ....   |
+         *            |  Align  |
+         *            ----------- <- user_sp
+         *              LowAddr
+         */
 
         let trap_ctx_ppn = addr_space
             .translate(VirtAddr::from(TRAP_CONTEXT))
@@ -176,6 +255,8 @@ impl TaskControlBlock {
             self.kernel_stack.top(),
             trap_handler as usize,
         );
+        *trap_ctx.arg_mut(0) = argc;
+        *trap_ctx.arg_mut(1) = argv_base;
 
         let mut task_inner = self.inner().exclusive_access();
         task_inner.address_space = addr_space;
@@ -276,33 +357,8 @@ impl TaskControlBlockInner {
     }
 
     #[inline]
-    pub fn exit_code(&self) -> i32 {
-        self.exit_code
-    }
-
-    #[inline]
-    pub fn children(&self) -> &[Arc<TaskControlBlock>] {
-        &self.children
-    }
-
-    #[inline]
     pub fn is_zombie(&self) -> bool {
         self.task_status == TaskStatus::Zombie
-    }
-
-    #[inline]
-    pub fn set_parent(&mut self, parent: Weak<TaskControlBlock>) {
-        self.parent = Some(parent);
-    }
-
-    #[inline]
-    pub fn add_child(&mut self, child: Arc<TaskControlBlock>) {
-        self.children.push(child);
-    }
-
-    #[inline]
-    pub fn remove_child(&mut self, index: usize) -> Arc<TaskControlBlock> {
-        self.children.remove(index)
     }
 
     /// 进程结束，但仍要作为子进程等待完全释放，
@@ -315,13 +371,8 @@ impl TaskControlBlockInner {
         self.kernel_time += stopwatch::refresh();
     }
 
-    #[inline]
-    pub fn fd_table(&self) -> &[Option<Arc<dyn File + Send + Sync>>] {
-        &self.fd_table
-    }
-
     /// 为 inode 分配文件描述符并返回
-    pub fn alloc_fd(&mut self, inode: Arc<OSInode>) -> usize {
+    pub fn alloc_fd(&mut self, inode: Arc<dyn File + Send + Sync>) -> usize {
         let fd = self
             .fd_table
             .iter()
@@ -338,5 +389,52 @@ impl TaskControlBlockInner {
     pub fn dealloc_fd(&mut self, fd: usize) -> Option<Arc<dyn File + Send + Sync>> {
         // 该线性表只增不减，留空位置以便复用
         self.fd_table[fd].take()
+    }
+
+    /// 休眠状态：
+    /// 进程停止执行但尚未被杀死，等待SIGCONT的通知
+    #[inline]
+    pub fn is_hibernating(&self) -> bool {
+        self.frozen && !self.killed
+    }
+
+    pub fn kernel_signal_handler(&mut self, signal: SignalFlag) {
+        if signal == SignalFlag::SIGSTOP {
+            self.frozen = true;
+            self.signals ^= signal;
+        } else if signal == SignalFlag::SIGCONT {
+            if self.signals.contains(signal) {
+                self.signals ^= signal;
+                self.frozen = false;
+            }
+        } else {
+            self.killed = true;
+        }
+    }
+
+    pub fn user_signal_handler(&mut self, signum: usize, signal: SignalFlag) {
+        let handler = self.sigactions[signum].handler;
+        // 检查进程是否提供了该信号的处理例程
+        if handler != 0 {
+            // user handler
+
+            // handle flag
+            self.handling_signal = Some(signum as u32);
+            // 清除该信号位
+            self.signals ^= signal;
+
+            // backup trapframe
+            let trap_ctx = self.trap_ctx();
+            self.trap_ctx_backup = Some(trap_ctx.clone());
+
+            // 修改 sepc 为预设的例程地址，令Trap返回用户态后跳转到例程入口
+            trap_ctx.set_sepc(handler);
+
+            // 修改 a0 寄存器，使信号类型作为参数传入例程
+            *trap_ctx.arg_mut(0) = signum;
+        } else {
+            // default action
+            println!("[K] task/user_signal_handler: default action: ignore it or kill process");
+        }
     }
 }
