@@ -7,7 +7,7 @@ extern crate user;
 use user::process::{fork, getpid, wait};
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     assert!(wait(&mut 0).is_none());
     println!("sys_wait without child process test passed!");
     println!("parent start, pid = {}!", getpid());

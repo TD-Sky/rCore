@@ -9,7 +9,7 @@ use user::process::getpid;
 use user::thread::yield_;
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     println!("Hello, I am process {}.", getpid());
     for i in 0..5 {
         yield_();

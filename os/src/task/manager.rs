@@ -4,18 +4,18 @@ use alloc::collections::{BTreeMap, VecDeque};
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
 
-use super::TaskControlBlock;
+use super::{ProcessControlBlock, TaskControlBlock, TaskStatus};
 use crate::sync::UPSafeCell;
+use crate::timer;
 
 lazy_static! {
     static ref TASK_MANAGER: UPSafeCell<TaskManager> =
         unsafe { UPSafeCell::new(TaskManager::default()) };
-    static ref PID2TCB: UPSafeCell<BTreeMap<usize, Arc<TaskControlBlock>>> =
+    static ref PID2TCB: UPSafeCell<BTreeMap<usize, Arc<ProcessControlBlock>>> =
         unsafe { UPSafeCell::new(BTreeMap::new()) };
 }
 
 pub fn add_task(task: Arc<TaskControlBlock>) {
-    PID2TCB.exclusive_access().insert(task.pid(), task.clone());
     TASK_MANAGER.exclusive_access().add(task);
 }
 
@@ -25,14 +25,29 @@ pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
 }
 
 #[inline]
-pub fn get_task(pid: usize) -> Option<Arc<TaskControlBlock>> {
+pub fn remove_task(task: &Arc<TaskControlBlock>) {
+    timer::remove_timer(task);
+    TASK_MANAGER.exclusive_access().remove(task);
+}
+
+pub fn wakeup_task(task: Arc<TaskControlBlock>) {
+    let mut task_inner = task.inner().exclusive_access();
+    task_inner.status = TaskStatus::Ready;
+    drop(task_inner);
+    add_task(task);
+}
+
+pub fn get_process(pid: usize) -> Option<Arc<ProcessControlBlock>> {
     PID2TCB.exclusive_access().get(&pid).cloned()
 }
 
-#[inline]
-pub fn remove_task(pid: usize) {
+pub fn insert_process(pid: usize, process: Arc<ProcessControlBlock>) {
+    PID2TCB.exclusive_access().insert(pid, process);
+}
+
+pub fn remove_process(pid: usize) {
     if PID2TCB.exclusive_access().remove(&pid).is_none() {
-        panic!("Task not found in pid2task, PID={pid}");
+        panic!("no process pid={pid} in PID-to-process");
     }
 }
 
@@ -49,5 +64,18 @@ impl TaskManager {
 
     fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
         self.ready_queue.pop_front()
+    }
+
+    fn remove(&mut self, task: &Arc<TaskControlBlock>) {
+        let task = Arc::as_ptr(task);
+
+        if let Some((id, _)) = self
+            .ready_queue
+            .iter()
+            .enumerate()
+            .find(|(_, t)| task == Arc::as_ptr(t))
+        {
+            self.ready_queue.remove(id);
+        }
     }
 }

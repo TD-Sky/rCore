@@ -46,7 +46,7 @@ impl TrapContext {
 impl TrapContext {
     /// 捏造上下文以复用`__restore`
     pub fn init(
-        entry: usize,
+        entry: usize, // 任务入口
         sp: usize,
         kernel_satp: usize,
         kernel_sp: usize,
@@ -89,10 +89,5 @@ impl TrapContext {
     /// 设置系统调用的结果
     pub fn set_syscall_result(&mut self, res: usize) {
         self.x[10] = res;
-    }
-
-    #[inline]
-    pub fn set_sepc(&mut self, sepc: usize) {
-        self.sepc = sepc;
     }
 }

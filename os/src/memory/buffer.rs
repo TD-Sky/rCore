@@ -5,6 +5,7 @@ use super::address::VirtAddr;
 use super::PageTable;
 
 /// 来自用户空间的缓冲区
+#[derive(Default)]
 pub struct UserBuffer(Vec<&'static mut [u8]>);
 
 impl UserBuffer {

@@ -13,6 +13,7 @@
 //! NOTE: stvec(Supervisor Trap Vector)：当异常发生时，PC应该跳转的地址
 
 mod context;
+
 pub use self::context::TrapContext;
 
 use core::arch::asm;
@@ -28,12 +29,10 @@ use riscv::register::stvec;
 use riscv::register::utvec::TrapMode;
 
 use crate::config::TRAMPOLINE;
-use crate::config::TRAP_CONTEXT;
 use crate::syscall::syscall;
 use crate::task;
 use crate::task::processor;
 use crate::task::signal::SignalFlag;
-use crate::task::switch::update_switch_time;
 use crate::timer;
 
 global_asm!(include_str!("trap.S"));
@@ -65,11 +64,25 @@ fn set_user_trap_entry() {
     }
 }
 
+/// timer interrupt enabled
+pub fn enable_timer_interrupt() {
+    // 我们并没有将应用初始 Trap上下文 的 sstatus 的 SPIE 设为1，
+    // 这将意味着CPU在用户态执行应用的时候 sstatus 的 SIE 为0。
+    //
+    // 根据定义来说，此时的CPU会屏蔽 S态 所有中断，
+    // 自然也包括 S特权级 时钟中断。
+    // 但是可以观察到应用经历一个时间片后仍被正常打断，
+    // 这是因为当CPU在 U态 接收到一个 S态 时钟中断时会被抢占，
+    // 这时无论 SIE 位是否被设置都会进入 Trap 处理流程。
+    unsafe {
+        sie::set_stimer();
+    }
+}
+
 // 这个 TrapContext 是在汇编里手动构造的
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
-    task::user_time_end();
     // Supervisor Exception Casue
     // 记录发生的异常
     let scause = scause::read();
@@ -114,6 +127,7 @@ pub fn trap_handler() -> ! {
 
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             timer::set_next_trigger();
+            timer::wakeup_timeout_tasks();
             task::suspend_current_and_run_next();
         }
 
@@ -124,30 +138,14 @@ pub fn trap_handler() -> ! {
         ),
     }
 
-    task::handle_signals();
+    /* task::handle_signals(); */
 
     if let Some((errno, msg)) = task::check_current_signal_error() {
         log::error!("[kernel] {msg}");
         task::exit_current_and_run_next(errno);
     }
 
-    task::user_time_start();
     trap_return();
-}
-
-/// timer interrupt enabled
-pub fn enable_timer_interrupt() {
-    // 我们并没有将应用初始 Trap上下文 的 sstatus 的 SPIE 设为1，
-    // 这将意味着CPU在用户态执行应用的时候 sstatus 的 SIE 为0。
-    //
-    // 根据定义来说，此时的CPU会屏蔽 S态 所有中断，
-    // 自然也包括 S特权级 时钟中断。
-    // 但是可以观察到应用经历一个时间片后仍被正常打断，
-    // 这是因为当CPU在 U态 接收到一个 S态 时钟中断时会被抢占，
-    // 这时无论 SIE 位是否被设置都会进入 Trap 处理流程。
-    unsafe {
-        sie::set_stimer();
-    }
 }
 
 /// 结束Trap处理环节，跳转到恢复函数
@@ -161,7 +159,7 @@ pub fn trap_return() -> ! {
     //
     // TRAMPOLINE加上二者的差得到运行时的__restore
     let restore_va = TRAMPOLINE + (__restore as usize - __alltraps as usize);
-    let trap_ctx_ptr = TRAP_CONTEXT;
+    let trap_ctx_ptr = processor::current_trap_ctx_user_va();
     let user_satp = processor::current_user_token();
 
     // 在内核中进行的一些操作可能导致一些
@@ -179,11 +177,4 @@ pub fn trap_return() -> ! {
             options(noreturn)
         );
     }
-}
-
-/// 新任务由此处进入用户态
-#[no_mangle]
-pub fn first_restore() -> ! {
-    update_switch_time();
-    trap_return()
 }

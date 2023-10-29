@@ -52,7 +52,3 @@ pub fn waitpid(pid: usize, exit_code: &mut i32) -> Option<usize> {
         }
     }
 }
-
-pub fn exit(exit_code: i32) -> ! {
-    sys_exit(exit_code)
-}

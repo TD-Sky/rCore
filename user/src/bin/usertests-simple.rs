@@ -22,7 +22,7 @@ static TESTS: &[&str] = &[
 ];
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     for test in TESTS {
         println!("Usertests: Running {test}");
         let pid = fork();

@@ -3,14 +3,16 @@
 //! - 任务当前使用栈的栈顶
 //! - 需保存的寄存器
 
-use crate::trap::first_restore;
+use crate::trap::trap_return;
 
-// |   s11   |
-// |   s10   |
-// |   ...   |
-// |   s0    |
-// |   sp    |
-// |   ra    |
+//   │   s11   │
+//   │   s10   │
+//   │   ...   │
+//   │  s0/fp  │
+//   │   sp    │
+//   │   ra    │
+//
+/// 任务上下文
 #[repr(C)]
 #[derive(Default)]
 pub struct TaskContext {
@@ -22,7 +24,7 @@ pub struct TaskContext {
 impl TaskContext {
     pub fn new(kernel_stack_top: usize) -> Self {
         Self {
-            ra: first_restore as usize,
+            ra: trap_return as usize,
             sp: kernel_stack_top,
             s: [0; 12],
         }

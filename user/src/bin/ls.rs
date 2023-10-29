@@ -11,7 +11,7 @@ use user::fs::{close, getdents, open, OpenFlag};
 use user::println;
 
 #[no_mangle]
-pub fn main(argc: usize, _argv: &[&str]) -> i32 {
+fn main(argc: usize, _argv: &[&str]) -> i32 {
     // 截至2023-09-02，不允许指定参数
     assert_eq!(argc, 1);
     let fd = open("/\0", OpenFlag::read_only()).expect("File not found");

@@ -12,17 +12,17 @@ mod lang_items;
 pub mod mem;
 pub mod process;
 pub mod signal;
+pub mod sync;
 mod syscall;
 pub mod thread;
 pub mod time;
 
 extern crate alloc;
+
+use self::thread::exit;
 use alloc::vec::Vec;
-use core::slice;
-
 use buddy_system_allocator::LockedHeap;
-
-use self::process::exit;
+use core::slice;
 
 /// 16KB 的堆空间
 const USER_HEAP_SIZE: usize = 0x4000;

@@ -13,16 +13,16 @@
 //! 一个进程可以访问多个文件，并通过**文件描述符表**管理。
 //! 表中的描述符表示带有特定读写属性的I/O资源(文件/目录/socket等)。
 
+pub mod eventfd;
 mod inode;
-pub use inode::*;
-
 mod pipe;
-pub use pipe::{Pipe, PipeRingBuffer};
-
 pub mod stdio;
 
-use crate::memory::UserBuffer;
+pub use self::{inode::*, pipe::*};
+
 use easy_fs::Stat;
+
+use crate::memory::UserBuffer;
 
 /// 内存与存储设备之间的数据交换通道
 pub trait File: Send + Sync {

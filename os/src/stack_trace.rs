@@ -3,37 +3,37 @@ use core::arch::asm;
 // Stack
 //                    .
 //                    .
-//       +->          .
-//       |   +-----------------+   |
-//       |   | return address  |   |
-//       |   |   previous fp ------+
-//       |   | saved registers |
-//       |   | local variables |
-//       |   |       ...       | <-+
-//       |   +-----------------+   |
-//       |   | return address  |   |
-//       +------ previous fp   |   |
-//           | saved registers |   |
-//           | local variables |   |
-//       +-> |       ...       |   |
-//       |   +-----------------+   |
-//       |   | return address  |   |
-//       |   |   previous fp ------+
-//       |   | saved registers |
-//       |   | local variables |
-//       |   |       ...       | <-+
-//       |   +-----------------+   |
-//       |   | return address  |   |
-//       +------ previous fp   |   |
-//           | saved registers |   |
-//           | local variables |   |
-//   $fp --> |       ...       |   |
-//           +-----------------+   |
-//           | return address  |   |
-//           |   previous fp ------+
-//           | saved registers |
-//   $sp --> | local variables |
-//           +-----------------+
+//       ┌─>          .
+//       │   ┌─────────────────┐   │
+//       │   │ return address  │   │
+//       │   │   previous fp ──────┘
+//       │   │ saved registers │
+//       │   │ local variables │
+//       │   │       ...       │ <─┐
+//       │   ├─────────────────┤   │
+//       │   │ return address  │   │
+//       └────── previous fp   │   │
+//           │ saved registers │   │
+//           │ local variables │   │
+//       ┌─> │       ...       │   │
+//       │   ├─────────────────┤   │
+//       │   │ return address  │   │
+//       │   │   previous fp ──────┘
+//       │   │ saved registers │
+//       │   │ local variables │
+//       │   │       ...       │ <─┐
+//       │   ├─────────────────┤   │
+//       │   │ return address  │   │
+//       └────── previous fp   │   │
+//           │ saved registers │   │
+//           │ local variables │   │
+//   $fp --> │       ...       │   │
+//           ├─────────────────┤   │
+//           │ return address  │   │
+//           │   previous fp ──────┘
+//           │ saved registers │
+//   $sp --> │ local variables │
+//           └─────────────────┘
 #[allow(dead_code)]
 pub unsafe fn print_stack_trace() {
     let mut fp: *const usize;

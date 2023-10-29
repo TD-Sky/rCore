@@ -12,7 +12,7 @@ macro_rules! color_text {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     println!(
         "{}{}{}{}{} {}{}{}{} {}{}{}{}{}{}",
         color_text!("H", 31),

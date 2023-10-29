@@ -7,7 +7,7 @@ use user::thread::sleep;
 use user::time::get_time;
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     println!("into sleep test!");
     let start = get_time();
     println!("current time_msec = {}", start);

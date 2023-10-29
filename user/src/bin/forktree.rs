@@ -4,8 +4,8 @@
 
 #[macro_use]
 extern crate user;
-use user::process::{exit, fork, getpid};
-use user::thread::{sleep, yield_};
+use user::process::{fork, getpid};
+use user::thread::{exit, sleep, yield_};
 
 const DEPTH: usize = 4;
 
@@ -31,7 +31,7 @@ fn fork_tree(cur: &str) {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     fork_tree("");
     sleep(3000);
     0

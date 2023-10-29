@@ -15,6 +15,7 @@ const READ: usize = 63;
 const WRITE: usize = 64;
 const FSTAT: usize = 80;
 const EXIT: usize = 93;
+const SLEEP: usize = 101;
 const YIELD: usize = 124;
 const SIGACTION: usize = 134;
 const SIGPROCMASK: usize = 135;
@@ -28,7 +29,20 @@ const FORK: usize = 220;
 const EXEC: usize = 221;
 const MMAP: usize = 222;
 const WAITPID: usize = 260;
+const EVENTFD: usize = 290;
 const SPAWN: usize = 400;
+const SPAWN_THREAD: usize = 1000;
+const GETTID: usize = 1001;
+const WAITTID: usize = 1002;
+const MUTEX_CREATE: usize = 1010;
+const MUTEX_LOCK: usize = 1011;
+const MUTEX_UNLOCK: usize = 1012;
+const SEMAPHORE_CREATE: usize = 1020;
+const SEMAPHORE_UP: usize = 1021;
+const SEMAPHORE_DOWN: usize = 1022;
+const CONDVAR_CREATE: usize = 1030;
+const CONDVAR_SIGNAL: usize = 1031;
+const CONDVAR_WAIT: usize = 1032;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
@@ -78,6 +92,10 @@ pub fn sys_exit(exit_code: i32) -> ! {
     unreachable!()
 }
 
+pub fn sys_sleep(duration_ms: usize) -> isize {
+    syscall(SLEEP, [duration_ms, 0, 0])
+}
+
 pub fn sys_yield() -> isize {
     syscall(YIELD, [0, 0, 0])
 }
@@ -115,12 +133,20 @@ pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
     syscall(EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0])
 }
 
+/// 参数
+/// * `pid`: 指定等待的进程ID。若为-1，则等待任意一个进程退出
+/// * `exit_code`: 退出码的指针
+///
 /// 结果
 /// * PID => 结束子进程的ID
 /// * -2 => 子进程存在，但尚未退出
 /// * -1 => 发生错误，例如子进程不存在
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(WAITPID, [pid as usize, exit_code as usize, 0])
+}
+
+pub fn sys_eventfd(initval: u64, flags: u32) -> isize {
+    syscall(EVENTFD, [initval as usize, flags as usize, 0])
 }
 
 pub fn sys_spawn(path: &str) -> isize {
@@ -211,4 +237,56 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
 pub fn sys_sigreturn() -> ! {
     syscall(SIGRETURN, [0, 0, 0]);
     unreachable!("signal routine must return successfully")
+}
+
+pub fn sys_spawn_thread(entry: usize, arg: usize) -> isize {
+    syscall(SPAWN_THREAD, [entry, arg, 0])
+}
+
+pub fn sys_gettid() -> isize {
+    syscall(GETTID, [0, 0, 0])
+}
+
+/// 结果
+/// * exit_code => 结束任务的退出码
+/// * -2 => 任务存在，但尚未退出
+/// * -1 => 发生错误，例如任务不存在
+pub fn sys_waittid(tid: usize) -> isize {
+    syscall(WAITTID, [tid, 0, 0])
+}
+
+pub fn sys_mutex_create(block: bool) -> isize {
+    syscall(MUTEX_CREATE, [block as usize, 0, 0])
+}
+
+pub fn sys_mutex_lock(id: usize) -> isize {
+    syscall(MUTEX_LOCK, [id, 0, 0])
+}
+
+pub fn sys_mutex_unlock(id: usize) -> isize {
+    syscall(MUTEX_UNLOCK, [id, 0, 0])
+}
+
+pub fn sys_semaphore_create(permits: usize) -> isize {
+    syscall(SEMAPHORE_CREATE, [permits, 0, 0])
+}
+
+pub fn sys_semaphore_up(id: usize) -> isize {
+    syscall(SEMAPHORE_UP, [id, 0, 0])
+}
+
+pub fn sys_semaphore_down(id: usize) -> isize {
+    syscall(SEMAPHORE_DOWN, [id, 0, 0])
+}
+
+pub fn sys_condvar_create() -> isize {
+    syscall(CONDVAR_CREATE, [0, 0, 0])
+}
+
+pub fn sys_condvar_signal(id: usize) -> isize {
+    syscall(CONDVAR_SIGNAL, [id, 0, 0])
+}
+
+pub fn sys_condvar_wait(id: usize, mutex_id: usize) -> isize {
+    syscall(CONDVAR_WAIT, [id, mutex_id, 0])
 }

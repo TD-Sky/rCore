@@ -1,28 +1,20 @@
 //! CPU状态管理
 
 use alloc::sync::Arc;
+
 use lazy_static::lazy_static;
 
+use super::ProcessControlBlock;
+use super::__switch;
 use super::manager;
-use super::switch::switch;
 use super::TaskContext;
 use super::TaskControlBlock;
 use super::TaskStatus;
-
-use crate::stopwatch;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 
 lazy_static! {
     static ref PROCESSOR: UPSafeCell<Processor> = unsafe { UPSafeCell::new(Processor::default()) };
-}
-
-pub fn current_task() -> Option<Arc<TaskControlBlock>> {
-    PROCESSOR.exclusive_access().current()
-}
-
-pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
-    PROCESSOR.exclusive_access().take_current()
 }
 
 #[derive(Default)]
@@ -41,8 +33,26 @@ impl Processor {
     }
 }
 
+pub fn current_process() -> Arc<ProcessControlBlock> {
+    current_task().unwrap().process.upgrade().unwrap()
+}
+
+pub fn current_task() -> Option<Arc<TaskControlBlock>> {
+    PROCESSOR.exclusive_access().current()
+}
+
+pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
+    PROCESSOR.exclusive_access().take_current()
+}
+
+/// 获取当前进程用户空间的`satp`。
+///
+/// 上下文 **已持有** 或 **即将持有** 当前进程的指针时，
+/// 莫用此函数，应使用 [`ProcessControlBlock::user_token`]
+///
+/// [`ProcessControlBlock::user_token`]: crate::task::ProcessControlBlock::user_token
 pub fn current_user_token() -> usize {
-    current_task().unwrap().inner().exclusive_access().token()
+    current_process().inner().exclusive_access().user_token()
 }
 
 pub fn current_trap_ctx() -> &'static mut TrapContext {
@@ -53,9 +63,17 @@ pub fn current_trap_ctx() -> &'static mut TrapContext {
         .trap_ctx()
 }
 
+pub fn current_trap_ctx_user_va() -> usize {
+    current_task()
+        .unwrap()
+        .inner()
+        .exclusive_access()
+        .resource
+        .trap_ctx_user_va()
+}
+
 /// 启动 idle 控制流
 pub fn run() {
-    stopwatch::refresh();
     loop {
         let mut processor = PROCESSOR.exclusive_access();
 
@@ -64,15 +82,15 @@ pub fn run() {
             let idle_task_ctx_ptr = &mut processor.idle_task_ctx as *mut TaskContext;
 
             let mut task_inner = task.inner().exclusive_access();
-            task_inner.task_status = TaskStatus::Running;
-            let next_task_ctx_ptr = &task_inner.task_ctx as *const TaskContext;
+            task_inner.status = TaskStatus::Running;
+            let next_task_ctx_ptr = &task_inner.ctx as *const TaskContext;
             drop(task_inner);
 
             processor.current = Some(task);
             drop(processor);
 
             unsafe {
-                switch(idle_task_ctx_ptr, next_task_ctx_ptr);
+                __switch(idle_task_ctx_ptr, next_task_ctx_ptr);
             }
             // 从 schedule 切换回来，继续循环
         }
@@ -86,6 +104,6 @@ pub fn schedule(task_ctx_ptr: *mut TaskContext) {
     drop(processor);
 
     unsafe {
-        switch(task_ctx_ptr, idle_task_ctx_ptr);
+        __switch(task_ctx_ptr, idle_task_ctx_ptr);
     }
 }

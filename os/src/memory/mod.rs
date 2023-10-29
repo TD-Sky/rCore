@@ -1,20 +1,17 @@
-mod address_space;
-pub use address_space::AddressSpace;
-pub use address_space::MapPermission;
-pub use address_space::KERNEL_SPACE;
-
 pub mod address;
-pub mod kernel_stack;
-
+mod address_space;
+mod buffer;
 pub mod frame_allocator;
 mod heap_allocator;
-
+mod kernel_stack;
 mod page_table;
-pub use page_table::PageTable;
-pub use page_table::{read_mut, read_ref, read_str, write_str};
 
-mod buffer;
-pub use buffer::UserBuffer;
+pub use self::{
+    address_space::{AddressSpace, MapPermission, KERNEL_SPACE},
+    buffer::UserBuffer,
+    kernel_stack::{alloc_kernel_stack, kernel_token, KernelStack},
+    page_table::{read_mut, read_ref, read_str, write_str, PageTable},
+};
 
 pub fn init() {
     heap_allocator::init();

@@ -5,9 +5,9 @@
 #[macro_use]
 extern crate user;
 
-use user::process::{exit, fork, waitpid};
+use user::process::{fork, waitpid};
 use user::signal::*;
-use user::thread::sleep;
+use user::thread::{exit, sleep};
 
 fn func() {
     println!("user_sig_test passed");
@@ -15,7 +15,7 @@ fn func() {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let pid = fork();
     if pid == 0 {
         let mut new = SignalAction::default();

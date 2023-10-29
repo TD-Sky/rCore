@@ -7,12 +7,14 @@
 #![feature(step_trait)]
 #![feature(format_args_nl)]
 #![feature(riscv_ext_intrinsics)]
+#![feature(let_chains)]
 
 extern crate alloc;
 
 #[macro_use]
 mod console;
 
+mod collections;
 mod config;
 mod drivers;
 mod fs;
@@ -21,7 +23,6 @@ mod logging;
 mod memory;
 mod sbi;
 mod stack_trace;
-mod stopwatch;
 mod sync;
 mod syscall;
 mod task;
@@ -53,7 +54,7 @@ pub fn rust_main() -> ! {
     logging::init();
     memory::init(); // 初始化分页
     task::add_initproc(); // 启动始祖进程
-    println!("[kernel] after initproc");
+    log::info!("[kernel] initproc started");
     trap::init(); // 设置好 Trap 处理入口
     trap::enable_timer_interrupt();
     timer::set_next_trigger(); // 开始定时

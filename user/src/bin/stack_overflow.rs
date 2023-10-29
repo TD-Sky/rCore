@@ -14,7 +14,7 @@ fn f(depth: usize) {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     println!("It should trigger segmentation fault!");
     f(0);
     0

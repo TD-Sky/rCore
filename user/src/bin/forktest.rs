@@ -4,12 +4,14 @@
 
 #[macro_use]
 extern crate user;
-use user::process::{exit, fork, wait};
+
+use user::process::{fork, wait};
+use user::thread::exit;
 
 const MAX_CHILD: usize = 30;
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     for i in 0..MAX_CHILD {
         let pid = fork();
         if pid == 0 {

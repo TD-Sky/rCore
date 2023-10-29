@@ -183,6 +183,7 @@ dependencies = [
  "buddy_system_allocator",
  "easy-fs",
  "enumflags2",
+ "lazy_static",
  "riscv",
 ]
 

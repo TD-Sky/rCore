@@ -21,6 +21,7 @@ const LF: u8 = 0x0a;
 /// carriage return
 const CR: u8 = 0x0d;
 /// backspace
+const DL: u8 = 0x7f;
 const BS: u8 = 0x08;
 const LINE_START: &str = ">> ";
 
@@ -97,7 +98,7 @@ fn main() -> i32 {
 
                 print!("{LINE_START}");
             }
-            BS => {
+            BS | DL => {
                 if !line.is_empty() {
                     print!("{} {}", BS as char, BS as char);
                     line.pop();

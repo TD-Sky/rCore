@@ -9,7 +9,7 @@ use user::fs::{close, open, OpenFlag};
 use user::io::read;
 
 #[no_mangle]
-pub fn main(argc: usize, argv: &[&str]) -> i32 {
+fn main(argc: usize, argv: &[&str]) -> i32 {
     assert!(argc == 2);
     let fd = open(argv[1], OpenFlag::read_only()).expect("Error occured when opening file");
     let fd = fd as usize;

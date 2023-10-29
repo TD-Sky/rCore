@@ -3,7 +3,7 @@
 #![feature(format_args_nl)]
 
 use user::process;
-use user::process::exit;
+use user::thread::exit;
 use user::signal::*;
 
 #[macro_use]
@@ -15,7 +15,7 @@ fn func() {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let mut new = SignalAction::default();
     let mut old = SignalAction::default();
     new.handler = func as usize;

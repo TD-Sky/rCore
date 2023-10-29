@@ -83,7 +83,7 @@ fn run_tests(tests: &[(&str, &str, &str, &str, i32)]) -> i32 {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let succ_num = run_tests(SUCC_TESTS);
     let err_num = run_tests(FAIL_TESTS);
     if succ_num == SUCC_TESTS.len() as i32 && err_num == FAIL_TESTS.len() as i32 {

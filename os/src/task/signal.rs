@@ -1,6 +1,6 @@
 use enumflags2::{bitflags, BitFlags};
 
-pub const COUNT: usize = 32;
+/* pub const COUNT: usize = 32; */
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone)]

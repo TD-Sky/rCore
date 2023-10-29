@@ -34,7 +34,7 @@ run: build pack-fs-img
 
 # -s 可以使 Qemu 监听本地 TCP 端口 1234 等待 GDB 客户端连接；
 # -S 可以使 Qemu 在收到 GDB 的请求后再开始运行。
-gdb-server: build
+gdb-server: build pack-fs-img
 	@qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
 gdb-client:

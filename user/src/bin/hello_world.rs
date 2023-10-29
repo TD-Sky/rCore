@@ -7,7 +7,7 @@ extern crate user;
 use user::process::getpid;
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     println!("pid {}: Hello world from user mode program!", getpid());
     0
 }

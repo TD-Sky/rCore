@@ -13,8 +13,10 @@ pub const PAGE_SIZE_BITS: usize = 12;
 
 /// 跳板地址
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
-/// Trap上下文地址
-pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+/// Trap上下文地址的计算起点
+pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 
-/// mmap距离堆底的偏移量，8G
-pub const MMAP_OFFSET_FROM: usize = 8 * 2usize.pow(30);
+/*
+* /// mmap距离堆底的偏移量，8G
+* pub const MMAP_OFFSET_FROM: usize = 8 * 2usize.pow(30);
+*/

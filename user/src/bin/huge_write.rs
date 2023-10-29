@@ -9,7 +9,7 @@ use user::io::write;
 use user::time::get_time;
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let mut buffer = [0u8; 1024]; // 1KiB
     for (i, ch) in buffer.iter_mut().enumerate() {
         *ch = i as u8;

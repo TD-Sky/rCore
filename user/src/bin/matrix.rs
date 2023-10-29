@@ -5,8 +5,8 @@
 
 #[macro_use]
 extern crate user;
-use user::process::{exit, fork, getpid, wait};
-use user::thread::yield_;
+use user::process::{fork, getpid, wait};
+use user::thread::{exit, yield_};
 use user::time::get_time;
 
 static NUM: usize = 30;
@@ -48,7 +48,7 @@ fn work(times: isize) {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     for _ in 0..NUM {
         let pid = fork();
         if pid == 0 {

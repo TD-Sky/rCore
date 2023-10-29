@@ -13,17 +13,108 @@
 //! 还是在用户空间内。此时跳板起了作用：对于所有地址空间，跳板的虚拟地址
 //! 均一致，且均映射到同一物理地址，故而让内核态下处于用户空间运行变得安全。
 //! 尔后，`__alltraps`会切换至内核空间。
-
-use super::address::*;
-use super::frame_allocator;
-use super::frame_allocator::Frame;
-use super::page_table;
-use super::page_table::PTEFlag;
-use super::page_table::{MappedVpn, UnmappedVpn};
-use super::PageTable;
-
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE};
-use crate::sync::UPSafeCell;
+//!
+//!
+//!
+//! ## 内核地址空间
+//!
+//! ### 低地址段
+//!
+//! ```txt
+//!              256GiB
+//!         ┌──────────────┐
+//!         │              │
+//!         ├──────────────┤
+//!         │ 可用物理页帧 │
+//!         ├──────────────┤
+//!         │    .bss      │
+//!         ├──────────────┤
+//!         │    .data     │
+//!         ├──────────────┤
+//!         │    .rodata   │
+//!         ├──────────────┤
+//!         │    .text     │
+//!         ├──────────────┤ <- BASE_ADDRESS
+//!         │              │
+//!         └──────────────┘ 0x0
+//! ```
+//!
+//! ### 高地址段
+//!
+//! ```txt
+//!                 2⁶⁴B
+//!         ┌─────────────────┐
+//!         │    trampoline   │
+//!         ├─────────────────┤ <- TRAMPOLINE
+//!         │ k0 kernel stack │
+//!         ├─────────────────┤
+//!         │    guard page   │
+//!         ├─────────────────┤
+//!         │ k1 kernel stack │
+//!         ├─────────────────┤
+//!         │    guard page   │
+//!         ├─────────────────┤
+//!         │ k2 kernel stack │
+//!         ├─────────────────┤
+//!         │     ......      │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         └─────────────────┘ 2⁶⁴B - 256GiB
+//! ```
+//!
+//!
+//!
+//! ## 用户地址空间
+//!
+//! ### 低地址段
+//!
+//! ```txt
+//!               256GiB
+//!         ┌───────────────┐
+//!         │     ......    │
+//!         ├───────────────┤
+//!         │ t2 user stack │
+//!         ├───────────────┤
+//!         │   guard page  │
+//!         ├───────────────┤
+//!         │ t1 user stack │
+//!         ├───────────────┤
+//!         │   guard page  │
+//!         ├───────────────┤
+//!         │ t0 user stack │
+//!         ├───────────────┤ <- user_stack_base
+//!         │   guard page  │
+//!         ├───────────────┤
+//!         │  ELF sections │
+//!         ├───────────────┤ 0x10000
+//!         │               │
+//!         └───────────────┘ 0x0
+//! ```
+//!
+//! ### 高地址段
+//!
+//! ```txt
+//!                2⁶⁴B
+//!         ┌─────────────────┐
+//!         │    trampoline   │
+//!         ├─────────────────┤ <- TRAMPOLINE
+//!         │ t0 trap context │
+//!         ├─────────────────┤ <- TRAP_CONTEXT_BASE (乘以0会将其消除)
+//!         │ t1 trap context │
+//!         ├─────────────────┤
+//!         │ t2 trap context │
+//!         ├─────────────────┤
+//!         │     ......      │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         │                 │
+//!         └─────────────────┘ 2⁶⁴B - 256GiB
+//! ```
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -36,8 +127,17 @@ use goblin::elf::Elf;
 use goblin::elf64::program_header::PT_LOAD;
 use goblin::elf64::program_header::{PF_R, PF_W, PF_X};
 use lazy_static::lazy_static;
-use log::{debug, info};
 use riscv::register::satp;
+
+use super::address::*;
+use super::frame_allocator;
+use super::frame_allocator::Frame;
+use super::page_table;
+use super::page_table::PTEFlag;
+use super::page_table::{MappedVpn, UnmappedVpn};
+use super::PageTable;
+use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
+use crate::sync::UPSafeCell;
 
 extern "C" {
     fn stext();
@@ -78,9 +178,8 @@ pub enum MapType {
 
     /// 由分配器分配物理页的映射
     Framed,
-
-    /// mmap直接映射
-    Mmap,
+    // /// mmap直接映射
+    // Mmap,
 }
 
 /// 从页表项的标志位截出部分位，
@@ -97,8 +196,7 @@ pub enum MapPermission {
 
 impl Clone for AddressSpace {
     /// 页表的内容是丢在内存里的，
-    /// 类型级别的复制无法包含页表，
-    /// 因此需要重新建立映射
+    /// 类型级别的复制无法包含页表，因此需要重新建立映射
     fn clone(&self) -> Self {
         // 用户地址空间的 fork
         let mut addr_space = Self::default();
@@ -131,20 +229,21 @@ impl AddressSpace {
     /// 否则MMU会直接认定它是一个不合法的虚拟地址。
     /// 因此，2^64个虚拟地址中，只有最高256G（前导1）与最低256G（前导0）可用。
     pub fn new_kernel() -> Self {
-        debug!("creating kernel address space");
+        log::debug!("creating kernel address space");
         let mut addr_space = Self::default();
 
         addr_space.map_trampoline();
 
-        info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
-        info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
-        info!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
-        info!(
+        log::info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
+        log::info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
+        log::info!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
+        log::info!(
             ".bss [{:#x}, {:#x})",
-            sbss_with_stack as usize, ebss as usize
+            sbss_with_stack as usize,
+            ebss as usize
         );
 
-        debug!("mapping .text section");
+        log::debug!("mapping .text section");
         addr_space
             .push(LogicSegment::new(
                 stext as usize,
@@ -154,7 +253,7 @@ impl AddressSpace {
             ))
             .unwrap();
 
-        debug!("mapping .rodata section");
+        log::debug!("mapping .rodata section");
         addr_space
             .push(LogicSegment::new(
                 srodata as usize,
@@ -164,7 +263,7 @@ impl AddressSpace {
             ))
             .unwrap();
 
-        debug!("mapping .data section");
+        log::debug!("mapping .data section");
         addr_space
             .push(LogicSegment::new(
                 sdata as usize,
@@ -174,7 +273,7 @@ impl AddressSpace {
             ))
             .unwrap();
 
-        debug!("mapping .bss section");
+        log::debug!("mapping .bss section");
         addr_space
             .push(LogicSegment::new(
                 sbss_with_stack as usize,
@@ -185,7 +284,7 @@ impl AddressSpace {
             .unwrap();
 
         // 用户可用内存，交给物理页帧分配器
-        debug!("mapping physical memory");
+        log::debug!("mapping physical memory");
         addr_space
             .push(LogicSegment::new(
                 ekernel as usize,
@@ -195,7 +294,7 @@ impl AddressSpace {
             ))
             .unwrap();
 
-        debug!("mapping memory-mapped registers");
+        log::debug!("mapping memory-mapped registers");
         for &(start, offset) in MMIO {
             addr_space
                 .push(LogicSegment::new(
@@ -214,7 +313,7 @@ impl AddressSpace {
     ///
     /// 返回：(地址空间, 用户栈顶地址, 程序入口地址)
     pub fn new_user(elf_data: &[u8]) -> (Self, usize, usize) {
-        debug!("creating user address space");
+        log::debug!("creating user address space");
         let mut addr_space = Self::default();
 
         addr_space.map_trampoline();
@@ -258,40 +357,10 @@ impl AddressSpace {
         }
 
         let max_end_vpn: usize = VirtAddr::from(max_end_vpn).into();
-        let user_stack_bottom = max_end_vpn + PAGE_SIZE; // 这样就空出了一个保护页
-        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+        // 空出一个保护页，得到任务用户栈的计算起点
+        let user_stack_base = max_end_vpn + PAGE_SIZE;
 
-        // 用户栈
-        addr_space
-            .push(LogicSegment::new(
-                user_stack_bottom,
-                user_stack_top,
-                MapType::Framed,
-                MapPermission::R | MapPermission::W | MapPermission::U,
-            ))
-            .unwrap();
-
-        // 堆，虽然此处是零分配，但令地址空间创建了堆逻辑段
-        addr_space
-            .push(LogicSegment::new(
-                user_stack_top,
-                user_stack_top,
-                MapType::Framed,
-                MapPermission::R | MapPermission::W,
-            ))
-            .unwrap();
-
-        // 映射Trap上下文的空间
-        addr_space
-            .push(LogicSegment::new(
-                TRAP_CONTEXT,
-                TRAMPOLINE,
-                MapType::Framed,
-                MapPermission::R | MapPermission::W,
-            ))
-            .unwrap();
-
-        (addr_space, user_stack_top, elf.header.e_entry as usize)
+        (addr_space, user_stack_base, elf.header.e_entry as usize)
     }
 
     pub fn insert_framed(
@@ -308,61 +377,63 @@ impl AddressSpace {
         ))
     }
 
-    /// 映射一块内存
-    ///
-    /// suggested_start 建议的地址：
-    /// - 若用户尚未给出建议，则该地址为默认的**mmap起始地址**；
-    /// - 若用户给出建议地址，本函数的调用者应该确认其不低于mmap起始地址，否则用默认的代替。
-    ///
-    /// 总之，建议地址一定大于等于mmap起始地址。
-    pub fn insert_mmap(
-        &mut self,
-        suggested_start: VirtAddr,
-        len: usize,
-        permission: BitFlags<MapPermission>,
-    ) -> Result<VirtAddr, MappedVpn> {
-        let actual_start = self
-            .logic_segments
-            .iter()
-            .filter(|&seg| seg.map_type == MapType::Mmap)
-            .map(|seg| &seg.vpn_range)
-            .fold(
-                suggested_start,
-                |actual_start: VirtAddr, &Range { start, end }| {
-                    let actual_start_vpn = actual_start.page_number();
-
-                    if (actual_start_vpn < start
-                        && (actual_start + len + PAGE_SIZE).page_number() >= start)
-                        || (start <= actual_start_vpn && actual_start_vpn <= end)
-                    {
-                        // 不合格的情况：
-                        // - 将要映射的逻辑段(前)(计入保护页)与已映射段(后)交叠；
-                        // - 将要映射的逻辑段开始地址落在已映射段内(包含结束地址)；
-                        //
-                        // 取末页加上保护页作为新的起始地址
-                        VirtAddr::from(end + 1)
-                    } else {
-                        // 合格
-                        actual_start
-                    }
-                },
-            );
-
-        debug!(
-            "area of mmap: [{:#x}, {:#x}) ",
-            usize::from(actual_start),
-            usize::from(actual_start + len)
-        );
-
-        self.push(LogicSegment::new(
-            actual_start,
-            actual_start + len,
-            MapType::Mmap,
-            permission,
-        ))?;
-
-        Ok(actual_start)
-    }
+    /*
+     * /// 映射一块内存
+     * ///
+     * /// suggested_start 建议的地址：
+     * /// - 若用户尚未给出建议，则该地址为默认的**mmap起始地址**；
+     * /// - 若用户给出建议地址，本函数的调用者应该确认其不低于mmap起始地址，否则用默认的代替。
+     * ///
+     * /// 总之，建议地址一定大于等于mmap起始地址。
+     * pub fn insert_mmap(
+     *     &mut self,
+     *     suggested_start: VirtAddr,
+     *     len: usize,
+     *     permission: BitFlags<MapPermission>,
+     * ) -> Result<VirtAddr, MappedVpn> {
+     *     let actual_start = self
+     *         .logic_segments
+     *         .iter()
+     *         .filter(|&seg| seg.map_type == MapType::Mmap)
+     *         .map(|seg| &seg.vpn_range)
+     *         .fold(
+     *             suggested_start,
+     *             |actual_start: VirtAddr, &Range { start, end }| {
+     *                 let actual_start_vpn = actual_start.page_number();
+     *
+     *                 if (actual_start_vpn < start
+     *                     && (actual_start + len + PAGE_SIZE).page_number() >= start)
+     *                     || (start <= actual_start_vpn && actual_start_vpn <= end)
+     *                 {
+     *                     // 不合格的情况：
+     *                     // - 将要映射的逻辑段(前)(计入保护页)与已映射段(后)交叠；
+     *                     // - 将要映射的逻辑段开始地址落在已映射段内(包含结束地址)；
+     *                     //
+     *                     // 取末页加上保护页作为新的起始地址
+     *                     VirtAddr::from(end + 1)
+     *                 } else {
+     *                     // 合格
+     *                     actual_start
+     *                 }
+     *             },
+     *         );
+     *
+     *     debug!(
+     *         "area of mmap: [{:#x}, {:#x}) ",
+     *         usize::from(actual_start),
+     *         usize::from(actual_start + len)
+     *     );
+     *
+     *     self.push(LogicSegment::new(
+     *         actual_start,
+     *         actual_start + len,
+     *         MapType::Mmap,
+     *         permission,
+     *     ))?;
+     *
+     *     Ok(actual_start)
+     * }
+     */
 
     pub fn remove(&mut self, start: VirtPageNum) -> Result<(), MapError> {
         let Some(index) = self
@@ -382,30 +453,32 @@ impl AddressSpace {
         Ok(())
     }
 
-    pub fn remove_mmap(&mut self, start: VirtPageNum) -> Result<(), MapError> {
-        let Some(index) = self
-            .logic_segments
-            .iter_mut()
-            .position(|seg| seg.vpn_range.start == start)
-        else {
-            return Err(MapError {
-                vpn: start,
-                kind: MapErrorKind::NoSegement,
-            });
-        };
-
-        if self.logic_segments[index].map_type != MapType::Mmap {
-            return Err(MapError {
-                vpn: start,
-                kind: MapErrorKind::TypeMissed,
-            });
-        }
-
-        let mut seg = self.logic_segments.remove(index);
-        seg.unmap(&mut self.page_table)?;
-
-        Ok(())
-    }
+    /*
+     * pub fn remove_mmap(&mut self, start: VirtPageNum) -> Result<(), MapError> {
+     *      let Some(index) = self
+     *          .logic_segments
+     *          .iter_mut()
+     *          .position(|seg| seg.vpn_range.start == start)
+     *      else {
+     *          return Err(MapError {
+     *              vpn: start,
+     *              kind: MapErrorKind::NoSegement,
+     *          });
+     *      };
+     *
+     *      if self.logic_segments[index].map_type != MapType::Mmap {
+     *          return Err(MapError {
+     *              vpn: start,
+     *              kind: MapErrorKind::TypeMissed,
+     *          });
+     *      }
+     *
+     *      let mut seg = self.logic_segments.remove(index);
+     *      seg.unmap(&mut self.page_table)?;
+     *
+     *      Ok(())
+     *  }
+     */
 
     /// 删除所有段，主要目的是归还物理页帧
     pub fn clear(&mut self) {
@@ -430,38 +503,42 @@ impl AddressSpace {
         unsafe { riscv64::sfence_vma_all() };
     }
 
-    pub fn shrink_to(&mut self, start: VirtAddr, lower_end: VirtAddr) -> Result<(), MapError> {
-        match self
-            .logic_segments
-            .iter_mut()
-            .find(|seg| seg.vpn_range.start == start.page_number())
-        {
-            Some(seg) => Ok(seg.shrink_to(&mut self.page_table, lower_end.page_number())?),
-            None => Err(MapError {
-                vpn: start.page_number(),
-                kind: MapErrorKind::NoSegement,
-            }),
-        }
-    }
+    /*
+     * pub fn shrink_to(&mut self, start: VirtAddr, lower_end: VirtAddr) -> Result<(), MapError> {
+     *     match self
+     *         .logic_segments
+     *         .iter_mut()
+     *         .find(|seg| seg.vpn_range.start == start.page_number())
+     *     {
+     *         Some(seg) => Ok(seg.shrink_to(&mut self.page_table, lower_end.page_number())?),
+     *         None => Err(MapError {
+     *             vpn: start.page_number(),
+     *             kind: MapErrorKind::NoSegement,
+     *         }),
+     *     }
+     * }
+     */
 
-    pub fn expand_to(&mut self, start: VirtAddr, higher_end: VirtAddr) -> Result<(), MapError> {
-        match self
-            .logic_segments
-            .iter_mut()
-            .find(|seg| seg.vpn_range.start == start.page_number())
-        {
-            Some(seg) => Ok(seg.expand_to(&mut self.page_table, higher_end.page_number())?),
-            None => Err(MapError {
-                vpn: start.page_number(),
-                kind: MapErrorKind::NoSegement,
-            }),
-        }
-    }
+    /*
+     * pub fn expand_to(&mut self, start: VirtAddr, higher_end: VirtAddr) -> Result<(), MapError> {
+     *     match self
+     *         .logic_segments
+     *         .iter_mut()
+     *         .find(|seg| seg.vpn_range.start == start.page_number())
+     *     {
+     *         Some(seg) => Ok(seg.expand_to(&mut self.page_table, higher_end.page_number())?),
+     *         None => Err(MapError {
+     *             vpn: start.page_number(),
+     *             kind: MapErrorKind::NoSegement,
+     *         }),
+     *     }
+     * }
+     */
 }
 
 impl AddressSpace {
-    /// 在内核地址空间的高256G部分之顶层分配跳板。
-    /// 实际上是将虚拟地址 TRAMPOLINE 映射到 .text.strampoline
+    /// 在内核地址空间高256G部分的顶层分配跳板
+    // NOTE: 实际上是将虚拟地址 TRAMPOLINE 映射到 .text.strampoline
     fn map_trampoline(&mut self) {
         self.page_table
             .map(
@@ -542,8 +619,7 @@ impl LogicSegment {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => ppn = vpn.identity_map(),
-            // 暂时让Mmap与Framed等价
-            MapType::Framed | MapType::Mmap => {
+            MapType::Framed => {
                 let frame = frame_allocator::alloc().unwrap();
                 ppn = frame.ppn;
                 self.vpn2frame.insert(vpn, frame);
@@ -583,31 +659,35 @@ impl LogicSegment {
         }
     }
 
-    fn shrink_to(
-        &mut self,
-        page_table: &mut PageTable,
-        lower_end: VirtPageNum,
-    ) -> Result<(), UnmappedVpn> {
-        for vpn in lower_end..self.vpn_range.end {
-            self.unmap_one(page_table, vpn)?;
-        }
+    /*
+     * fn shrink_to(
+     *     &mut self,
+     *     page_table: &mut PageTable,
+     *     lower_end: VirtPageNum,
+     * ) -> Result<(), UnmappedVpn> {
+     *     for vpn in lower_end..self.vpn_range.end {
+     *         self.unmap_one(page_table, vpn)?;
+     *     }
+     *
+     *     self.vpn_range.end = lower_end;
+     *     Ok(())
+     * }
+     */
 
-        self.vpn_range.end = lower_end;
-        Ok(())
-    }
-
-    fn expand_to(
-        &mut self,
-        page_table: &mut PageTable,
-        higher_end: VirtPageNum,
-    ) -> Result<(), MappedVpn> {
-        for vpn in self.vpn_range.end..higher_end {
-            self.map_one(page_table, vpn)?;
-        }
-
-        self.vpn_range.end = higher_end;
-        Ok(())
-    }
+    /*
+     * fn expand_to(
+     *     &mut self,
+     *     page_table: &mut PageTable,
+     *     higher_end: VirtPageNum,
+     * ) -> Result<(), MappedVpn> {
+     *     for vpn in self.vpn_range.end..higher_end {
+     *         self.map_one(page_table, vpn)?;
+     *     }
+     *
+     *     self.vpn_range.end = higher_end;
+     *     Ok(())
+     * }
+     */
 }
 
 pub use error::*;
@@ -626,7 +706,7 @@ mod error {
         NoSegement,
         MappedVpn,
         UnmappedVpn,
-        TypeMissed,
+        // TypeMissed,
     }
 
     impl From<MappedVpn> for MapError {

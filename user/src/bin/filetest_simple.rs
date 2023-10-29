@@ -10,7 +10,7 @@ use user::fs::{close, open, OpenFlag};
 use user::io::{read, write};
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let test_str = "Hello, world!";
     let filea = "filea\0";
     let fd = open(filea, OpenFlag::CREATE | OpenFlag::WRONLY).unwrap();

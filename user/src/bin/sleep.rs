@@ -5,8 +5,8 @@
 #[macro_use]
 extern crate user;
 
-use user::process::{exit, fork, waitpid};
-use user::thread::sleep;
+use user::process::{fork, waitpid};
+use user::thread::{exit, sleep};
 use user::time::get_time;
 
 fn sleepy() {
@@ -19,7 +19,7 @@ fn sleepy() {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+fn main() -> i32 {
     let current_time = get_time();
     let pid = fork();
     let mut exit_code: i32 = 0;
