@@ -9,23 +9,18 @@
 //!
 //! 缓存与块设备同步后并不会移除块缓存，该操作由缓存管理器调度执行。
 
-use lazy_static::lazy_static;
-use spin::Mutex;
-
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
 
+use spin::Mutex;
+
 use crate::BlockDevice;
 use crate::BLOCK_SIZE;
 
-lazy_static! {
-    static ref BLOCK_CACHE_MANAGER: Mutex<BlockCacheManager> =
-        Mutex::new(BlockCacheManager::default());
-}
+static BLOCK_CACHE_MANAGER: Mutex<BlockCacheManager> = Mutex::new(BlockCacheManager::new());
 
 /// 块缓存全局管理，缓存、调度块缓存
-#[derive(Default)]
 struct BlockCacheManager {
     queue: Vec<(usize, Arc<Mutex<BlockCache>>)>,
 }
@@ -78,7 +73,7 @@ impl BlockCache {
     pub fn get<T: Sized>(&self, offset: usize) -> &T {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= BLOCK_SIZE);
-        let addr = self.offset(offset) as *const T;
+        let addr = self.offset(offset).cast();
         unsafe { &*addr }
     }
 
@@ -86,7 +81,7 @@ impl BlockCache {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= BLOCK_SIZE);
         self.modified = true;
-        let addr = self.offset(offset) as *mut T;
+        let addr = self.offset(offset).cast_mut().cast();
         unsafe { &mut *addr }
     }
 
@@ -104,7 +99,7 @@ impl BlockCache {
 impl BlockCache {
     #[inline]
     fn offset(&self, count: usize) -> *const u8 {
-        &self.data[count] as *const u8
+        &self.data[count]
     }
 }
 
@@ -117,6 +112,10 @@ impl Drop for BlockCache {
 impl BlockCacheManager {
     /// 块缓存个数的上限
     const CAPACITY: usize = 16;
+
+    const fn new() -> Self {
+        Self { queue: Vec::new() }
+    }
 
     // 块缓存调度策略：踢走闲置块
     fn get(

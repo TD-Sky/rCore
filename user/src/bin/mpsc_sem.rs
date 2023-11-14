@@ -8,6 +8,8 @@ extern crate user;
 extern crate alloc;
 
 use alloc::vec::Vec;
+use core::ptr;
+
 use user::sync::{semaphore_create, semaphore_down, semaphore_up};
 use user::thread::{exit, waittid};
 
@@ -59,7 +61,7 @@ fn main() -> i32 {
     for i in 0..PRODUCER_COUNT {
         threads.push(user::thread::spawn(
             producer as usize,
-            &ids.as_slice()[i] as *const _ as usize,
+            ptr::from_ref(&ids.as_slice()[i]) as usize,
         ));
     }
     threads.push(user::thread::spawn(consumer as usize, 0));

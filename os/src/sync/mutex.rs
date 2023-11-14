@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use core::sync::atomic;
 use core::sync::atomic::AtomicBool;
 
-use super::UPSafeCell;
+use super::UpCell;
 use crate::task;
 use crate::task::manager;
 use crate::task::processor;
@@ -20,7 +20,7 @@ pub struct SpinMutex {
 
 pub struct BlockMutex {
     locked: AtomicBool,
-    wait_queue: UPSafeCell<VecDeque<Arc<TaskControlBlock>>>,
+    wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
 impl Mutex for SpinMutex {
@@ -78,7 +78,7 @@ impl BlockMutex {
     pub fn new() -> Self {
         Self {
             locked: AtomicBool::new(false),
-            wait_queue: unsafe { UPSafeCell::new(VecDeque::new()) },
+            wait_queue: UpCell::new(VecDeque::new()),
         }
     }
 }

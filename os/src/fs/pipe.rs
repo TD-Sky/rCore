@@ -2,13 +2,13 @@ use alloc::sync::{Arc, Weak};
 
 use super::File;
 use crate::memory::UserBuffer;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::task;
 
 pub struct Pipe {
     readable: bool,
     writable: bool,
-    buffer: Arc<UPSafeCell<PipeRingBuffer>>,
+    buffer: Arc<UpCell<PipeRingBuffer>>,
 }
 
 #[derive(Debug, Default)]
@@ -112,7 +112,7 @@ impl File for Pipe {
 
 impl Pipe {
     #[inline]
-    fn read_end(buffer: Arc<UPSafeCell<PipeRingBuffer>>) -> Self {
+    fn read_end(buffer: Arc<UpCell<PipeRingBuffer>>) -> Self {
         Self {
             readable: true,
             writable: false,
@@ -121,7 +121,7 @@ impl Pipe {
     }
 
     #[inline]
-    fn write_end(buffer: Arc<UPSafeCell<PipeRingBuffer>>) -> Self {
+    fn write_end(buffer: Arc<UpCell<PipeRingBuffer>>) -> Self {
         Self {
             readable: false,
             writable: true,
@@ -132,7 +132,7 @@ impl Pipe {
 
 impl PipeRingBuffer {
     pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
-        let buffer = Arc::new(unsafe { UPSafeCell::new(PipeRingBuffer::default()) });
+        let buffer = Arc::new(UpCell::new(PipeRingBuffer::default()));
         let read_end = Arc::new(Pipe::read_end(buffer.clone()));
         let write_end = Arc::new(Pipe::write_end(buffer.clone()));
         buffer.exclusive_access().write_end = Arc::downgrade(&write_end);

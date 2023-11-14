@@ -8,6 +8,13 @@ pub struct RecycleAllocator {
 }
 
 impl RecycleAllocator {
+    pub const fn new() -> Self {
+        Self {
+            current: 0,
+            recycled: Vec::new(),
+        }
+    }
+
     pub fn alloc(&mut self) -> usize {
         if let Some(id) = self.recycled.pop() {
             id

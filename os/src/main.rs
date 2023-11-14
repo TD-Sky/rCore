@@ -1,13 +1,13 @@
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
-#![feature(stdsimd)]
 #![feature(slice_from_ptr_range)]
 #![feature(const_trait_impl)]
 #![feature(step_trait)]
 #![feature(format_args_nl)]
 #![feature(riscv_ext_intrinsics)]
 #![feature(let_chains)]
+#![feature(const_binary_heap_constructor)]
 
 extern crate alloc;
 
@@ -21,6 +21,7 @@ mod fs;
 mod lang_items;
 mod logging;
 mod memory;
+mod ptr;
 mod sbi;
 mod stack_trace;
 mod sync;
@@ -35,7 +36,11 @@ mod board;
 use core::arch::global_asm;
 use core::slice;
 
-global_asm!(include_str!("entry.asm"));
+use spin::Lazy;
+
+use crate::drivers::{IOMode, DEV_IO_MODE, GPU_DEVICE, KEYBOARD_DEVICE, MOUSE_DEVICE, SERIAL};
+
+global_asm!(include_str!("entry.S"));
 
 extern "C" {
     fn sbss();
@@ -53,11 +58,27 @@ pub fn rust_main() -> ! {
     clear_bss();
     logging::init();
     memory::init(); // 初始化分页
-    task::add_initproc(); // 启动始祖进程
-    log::info!("[kernel] initproc started");
+
+    SERIAL.init();
+
+    log::info!("init GPU");
+    Lazy::force(&GPU_DEVICE);
+    log::info!("init keyboard");
+    Lazy::force(&KEYBOARD_DEVICE);
+    log::info!("init mouse");
+    Lazy::force(&MOUSE_DEVICE);
+
+    log::info!("init trap");
     trap::init(); // 设置好 Trap 处理入口
     trap::enable_timer_interrupt();
     timer::set_next_trigger(); // 开始定时
+    board::init_device();
+
+    log::info!("add initproc");
+    task::add_initproc(); // 启动始祖进程
+    *DEV_IO_MODE.exclusive_access() = IOMode::Interrupt;
+
+    log::info!("run");
     task::run();
 
     unreachable!()

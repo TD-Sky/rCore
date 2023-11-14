@@ -3,9 +3,7 @@
 use crate::config::PAGE_SIZE;
 use crate::config::PAGE_SIZE_BITS;
 
-use core::fmt;
-use core::fmt::Formatter;
-use core::fmt::{Debug, LowerHex};
+use core::fmt::LowerHex;
 use core::iter::Step;
 use core::ops::{Add, AddAssign, Shl};
 use core::slice;
@@ -62,6 +60,10 @@ impl VirtAddr {
         self.0 & ((1 << PAGE_SIZE_BITS) - 1)
     }
 
+    pub fn is_aligned(&self) -> bool {
+        self.page_offset() == 0
+    }
+
     /// 本虚拟地址的页号，区间的闭端
     pub fn floor(&self) -> VirtPageNum {
         // 十六进制下，一位有16种情况，
@@ -74,12 +76,12 @@ impl VirtAddr {
 
     /// 本虚拟地址的上界页号，区间的开端
     pub fn ceil(&self) -> VirtPageNum {
-        VirtPageNum((self.0 - 1 + PAGE_SIZE) / PAGE_SIZE)
+        VirtPageNum(self.0.div_ceil(PAGE_SIZE))
     }
 }
 
-impl Debug for VirtPageNum {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for VirtPageNum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         LowerHex::fmt(&self.0, f)
     }
 }
@@ -130,11 +132,14 @@ impl PhysAddr {
         self.floor()
     }
 
-    #[allow(dead_code)]
     pub fn page_offset(&self) -> usize {
         // 1左移多少位，就是在右侧留下多少个0，
         // 再减去1，这些0全部变成1，而先前最左侧的1消失
         self.0 & ((1 << PAGE_SIZE_BITS) - 1)
+    }
+
+    pub fn is_aligned(&self) -> bool {
+        self.page_offset() == 0
     }
 
     /// 本物理地址的页号，区间的闭端
@@ -149,7 +154,7 @@ impl PhysAddr {
 
     /// 本物理地址的上界页号，区间的开端
     pub fn ceil(&self) -> PhysPageNum {
-        PhysPageNum((self.0 - 1 + PAGE_SIZE) / PAGE_SIZE)
+        PhysPageNum(self.0.div_ceil(PAGE_SIZE))
     }
 
     pub fn as_ref<T>(self) -> &'static T {
@@ -161,8 +166,8 @@ impl PhysAddr {
     }
 }
 
-impl Debug for PhysPageNum {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for PhysPageNum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         LowerHex::fmt(&self.0, f)
     }
 }

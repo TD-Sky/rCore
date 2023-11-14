@@ -1,12 +1,24 @@
 mod virtio_blk;
-pub use virtio_blk::VirtIOBlock;
 
 use alloc::sync::Arc;
+
 use easy_fs::BlockDevice;
-use lazy_static::lazy_static;
+use spin::Lazy;
 
-use crate::board::BlockDeviceImpl;
+use crate::sync::UpCell;
 
-lazy_static! {
-    pub static ref BLOCK_DEVICE: Arc<dyn BlockDevice> = Arc::new(BlockDeviceImpl::new());
+use self::virtio_blk::VirtIOBlock;
+
+/// 初始化为轮询。
+/// 因为中断IO需要利用休眠任务队列，而始祖进程创建前任务队列为空，
+/// 所以必须通过轮询加载始祖进程，尔后才能利用中断IO
+pub static DEV_IO_MODE: UpCell<IOMode> = UpCell::new(IOMode::Poll);
+
+pub static BLOCK_DEVICE: Lazy<Arc<dyn BlockDevice>> = Lazy::new(|| Arc::new(VirtIOBlock::new()));
+
+/// IO方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IOMode {
+    Interrupt,
+    Poll,
 }

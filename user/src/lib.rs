@@ -7,6 +7,7 @@
 #[macro_use]
 pub mod console;
 pub mod fs;
+pub mod graph;
 pub mod io;
 mod lang_items;
 pub mod mem;
@@ -65,8 +66,5 @@ fn main(_argc: usize, _argv: &[&str]) -> i32 {
 
 #[inline]
 fn status2option(status: isize) -> Option<usize> {
-    match status {
-        -1 => None,
-        x => Some(x as usize),
-    }
+    (status >= 0).then_some(status as usize)
 }

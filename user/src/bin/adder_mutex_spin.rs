@@ -7,6 +7,7 @@ extern crate user;
 extern crate alloc;
 
 use alloc::vec::Vec;
+use core::ptr;
 
 use user::sync::*;
 use user::thread::{self, exit, waittid};
@@ -18,7 +19,7 @@ const THREAD_COUNT_DEFAULT: usize = 16;
 static mut PER_THREAD: usize = 0;
 
 unsafe fn critical_section(t: &mut usize) {
-    let a = &mut A as *mut usize;
+    let a = ptr::addr_of_mut!(A);
     let cur = a.read_volatile();
     for _ in 0..500 {
         *t = (*t) * (*t) % 10007;

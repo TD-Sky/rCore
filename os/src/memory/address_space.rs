@@ -117,16 +117,15 @@
 //! ```
 
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::arch::riscv64;
 use core::ops::Range;
+use spin::Lazy;
 
 use enumflags2::{bitflags, BitFlags};
 use goblin::elf::Elf;
 use goblin::elf64::program_header::PT_LOAD;
 use goblin::elf64::program_header::{PF_R, PF_W, PF_X};
-use lazy_static::lazy_static;
 use riscv::register::satp;
 
 use super::address::*;
@@ -136,8 +135,9 @@ use super::page_table;
 use super::page_table::PTEFlag;
 use super::page_table::{MappedVpn, UnmappedVpn};
 use super::PageTable;
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
-use crate::sync::UPSafeCell;
+use crate::board::mmio_segments;
+use crate::config::{MEMORY_END, PAGE_SIZE, TRAMPOLINE};
+use crate::sync::UpCell;
 
 extern "C" {
     fn stext();
@@ -152,10 +152,8 @@ extern "C" {
     fn strampoline();
 }
 
-lazy_static! {
-    pub static ref KERNEL_SPACE: Arc<UPSafeCell<AddressSpace>> =
-        Arc::new(unsafe { UPSafeCell::new(AddressSpace::new_kernel()) });
-}
+pub static KERNEL_SPACE: Lazy<UpCell<AddressSpace>> =
+    Lazy::new(|| UpCell::new(AddressSpace::new_kernel()));
 
 /// 地址空间由一系列有关联但不一定连续的逻辑段组成
 #[derive(Default)]
@@ -178,8 +176,9 @@ pub enum MapType {
 
     /// 由分配器分配物理页的映射
     Framed,
-    // /// mmap直接映射
-    // Mmap,
+
+    /// 页码的偏移
+    Linear(isize),
 }
 
 /// 从页表项的标志位截出部分位，
@@ -295,11 +294,11 @@ impl AddressSpace {
             .unwrap();
 
         log::debug!("mapping memory-mapped registers");
-        for &(start, offset) in MMIO {
+        for (start, end) in mmio_segments() {
             addr_space
                 .push(LogicSegment::new(
                     start,
-                    start + offset,
+                    end,
                     MapType::Identical,
                     MapPermission::R | MapPermission::W,
                 ))
@@ -373,6 +372,21 @@ impl AddressSpace {
             start_va,
             end_va,
             MapType::Framed,
+            permission,
+        ))
+    }
+
+    pub fn insert_linear(
+        &mut self,
+        start_va: VirtAddr,
+        len: usize,
+        pn_offset: isize,
+        permission: BitFlags<MapPermission>,
+    ) -> Result<(), MappedVpn> {
+        self.push(LogicSegment::new(
+            start_va,
+            start_va + len,
+            MapType::Linear(pn_offset),
             permission,
         ))
     }
@@ -623,6 +637,11 @@ impl LogicSegment {
                 let frame = frame_allocator::alloc().unwrap();
                 ppn = frame.ppn;
                 self.vpn2frame.insert(vpn, frame);
+            }
+            MapType::Linear(pn_offset) => {
+                let vpn: usize = vpn.into();
+                assert!(vpn < (1usize << 27)); // 位于低256G
+                ppn = PhysPageNum::from_raw((vpn as isize + pn_offset) as usize)
             }
         }
 

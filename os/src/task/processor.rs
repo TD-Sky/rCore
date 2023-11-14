@@ -1,8 +1,8 @@
 //! CPU状态管理
 
-use alloc::sync::Arc;
+use core::ptr;
 
-use lazy_static::lazy_static;
+use alloc::sync::Arc;
 
 use super::ProcessControlBlock;
 use super::__switch;
@@ -10,12 +10,10 @@ use super::manager;
 use super::TaskContext;
 use super::TaskControlBlock;
 use super::TaskStatus;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::trap::TrapContext;
 
-lazy_static! {
-    static ref PROCESSOR: UPSafeCell<Processor> = unsafe { UPSafeCell::new(Processor::default()) };
-}
+static PROCESSOR: UpCell<Processor> = UpCell::new(Processor::new());
 
 #[derive(Default)]
 struct Processor {
@@ -24,6 +22,13 @@ struct Processor {
 }
 
 impl Processor {
+    const fn new() -> Self {
+        Self {
+            current: None,
+            idle_task_ctx: TaskContext::empty(),
+        }
+    }
+
     fn current(&self) -> Option<Arc<TaskControlBlock>> {
         self.current.clone()
     }
@@ -79,12 +84,12 @@ pub fn run() {
 
         // 直到取得预备的新任务
         if let Some(task) = manager::fetch_task() {
-            let idle_task_ctx_ptr = &mut processor.idle_task_ctx as *mut TaskContext;
+            let idle_task_ctx_ptr = ptr::addr_of_mut!(processor.idle_task_ctx);
 
-            let mut task_inner = task.inner().exclusive_access();
-            task_inner.status = TaskStatus::Running;
-            let next_task_ctx_ptr = &task_inner.ctx as *const TaskContext;
-            drop(task_inner);
+            let next_task_ctx_ptr = task.inner().exclusive_session(|task| {
+                task.status = TaskStatus::Running;
+                ptr::addr_of!(task.ctx)
+            });
 
             processor.current = Some(task);
             drop(processor);
@@ -99,9 +104,8 @@ pub fn run() {
 
 /// 切换回 idle 控制流
 pub fn schedule(task_ctx_ptr: *mut TaskContext) {
-    let processor = PROCESSOR.exclusive_access();
-    let idle_task_ctx_ptr = &processor.idle_task_ctx as *const TaskContext;
-    drop(processor);
+    let idle_task_ctx_ptr =
+        PROCESSOR.exclusive_session(|processor| ptr::addr_of!(processor.idle_task_ctx));
 
     unsafe {
         __switch(task_ctx_ptr, idle_task_ctx_ptr);

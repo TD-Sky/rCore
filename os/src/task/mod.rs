@@ -20,10 +20,10 @@ pub use self::{
 };
 
 use alloc::sync::Arc;
-use core::mem;
+use core::{mem, ptr};
+use spin::Lazy;
 
 use enumflags2::BitFlags;
-use lazy_static::lazy_static;
 
 use self::signal::SignalFlag;
 use crate::fs::open_file;
@@ -32,50 +32,50 @@ use crate::sbi::shutdown;
 
 const IDLE_PID: usize = 0;
 
-lazy_static! {
-    static ref INITPROC: Arc<ProcessControlBlock> = ProcessControlBlock::new(
+static INITPROC: Lazy<Arc<ProcessControlBlock>> = Lazy::new(|| {
+    ProcessControlBlock::new(
         &open_file("initproc", BitFlags::from_bits_truncate(OpenFlag::RDONLY))
             .unwrap()
-            .read_all()
-    );
-}
+            .read_all(),
+    )
+});
 
 pub fn add_initproc() {
-    lazy_static::initialize(&INITPROC);
+    Lazy::force(&INITPROC);
 }
 
 pub fn suspend_current_and_run_next() {
     let task = processor::take_current_task().unwrap();
 
-    let mut task_inner = task.inner().exclusive_access();
-    task_inner.status = TaskStatus::Ready;
-    let task_ctx_ptr = &mut task_inner.ctx as *mut TaskContext;
-    drop(task_inner);
+    let task_ctx_ptr = task.inner().exclusive_session(|task| {
+        task.status = TaskStatus::Ready;
+        ptr::addr_of_mut!(task.ctx)
+    });
 
     manager::add_task(task);
     processor::schedule(task_ctx_ptr);
 }
 
-pub fn block_current_and_run_next() {
+pub fn block_current() -> *mut TaskContext {
     let task = processor::take_current_task().unwrap();
     let mut task_inner = task.inner().exclusive_access();
-    let task_ctx_ptr = &mut task_inner.ctx as *mut TaskContext;
     task_inner.status = TaskStatus::Blocked;
-    drop(task_inner);
+    ptr::addr_of_mut!(task_inner.ctx)
+}
 
+pub fn block_current_and_run_next() {
+    let task_ctx_ptr = block_current();
     processor::schedule(task_ctx_ptr);
 }
 
 pub fn exit_current_and_run_next(exit_code: i32) {
     let task = processor::take_current_task().unwrap();
-    let mut task_inner = task.inner().exclusive_access();
-    let tid = task_inner.resource.tid;
-
-    task_inner.exit_code = Some(exit_code);
-    task_inner.resource.dealloc();
-
+    let tid = task.inner().exclusive_session(|inner| {
+        inner.exit_code = Some(exit_code);
+        inner.resource.dealloc();
+        inner.resource.tid
+    });
     let process = task.process.upgrade().unwrap();
-    drop(task_inner);
     drop(task);
 
     if tid == 0 {
@@ -92,13 +92,12 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         process_inner.is_zombie = true;
         process_inner.exit_code = exit_code;
 
-        {
-            let mut initproc = INITPROC.inner().exclusive_access();
+        INITPROC.inner().exclusive_session(|initproc| {
             for child in &process_inner.children {
                 child.inner().exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
                 initproc.children.push(child.clone());
             }
-        }
+        });
 
         let tasks = mem::take(&mut process_inner.tasks);
         drop(process_inner);
@@ -117,7 +116,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
     drop(process);
     let mut tmp_task_ctx = TaskContext::default();
-    processor::schedule(&mut tmp_task_ctx as *mut TaskContext);
+    processor::schedule(ptr::addr_of_mut!(tmp_task_ctx));
 }
 
 pub fn send_signal_to_current(signal: SignalFlag) {

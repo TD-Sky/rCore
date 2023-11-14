@@ -9,7 +9,7 @@ use crate::memory::address::VirtAddr;
 use crate::memory::alloc_kernel_stack;
 use crate::memory::KernelStack;
 use crate::memory::MapPermission;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::trap::TrapContext;
 
 pub struct TaskControlBlock {
@@ -17,7 +17,7 @@ pub struct TaskControlBlock {
     pub process: Weak<ProcessControlBlock>,
     pub kernel_stack: KernelStack,
     // mutable
-    inner: UPSafeCell<TaskControlBlockInner>,
+    inner: UpCell<TaskControlBlockInner>,
 }
 
 pub struct TaskControlBlockInner {
@@ -67,8 +67,8 @@ impl TaskControlBlock {
         Self {
             process: Arc::downgrade(process),
             kernel_stack,
-            inner: unsafe {
-                UPSafeCell::new(TaskControlBlockInner {
+            inner: {
+                UpCell::new(TaskControlBlockInner {
                     resource,
                     trap_ctx_ppn,
                     ctx: TaskContext::new(kstack_top),
@@ -79,7 +79,7 @@ impl TaskControlBlock {
         }
     }
 
-    pub fn inner(&self) -> &UPSafeCell<TaskControlBlockInner> {
+    pub fn inner(&self) -> &UpCell<TaskControlBlockInner> {
         &self.inner
     }
 }

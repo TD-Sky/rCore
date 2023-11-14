@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use core::mem;
 
 use enumflags2::BitFlags;
-use lazy_static::lazy_static;
 
 use super::manager;
 use super::signal::SignalFlag;
@@ -14,17 +13,14 @@ use crate::collections::SlotVec;
 use crate::fs::stdio::{Stdin, Stdout};
 use crate::fs::File;
 use crate::memory::{self, AddressSpace, KERNEL_SPACE};
-use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
+use crate::sync::{Condvar, Mutex, Semaphore, UpCell};
 use crate::trap::{trap_handler, TrapContext};
 
-lazy_static! {
-    static ref PID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
-        unsafe { UPSafeCell::new(RecycleAllocator::default()) };
-}
+static PID_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 
 pub struct ProcessControlBlock {
     pid: PidHandle,
-    inner: UPSafeCell<ProcessControlBlockInner>,
+    inner: UpCell<ProcessControlBlockInner>,
 }
 
 /// 进程描述符
@@ -32,7 +28,7 @@ pub struct PidHandle(usize);
 
 pub struct ProcessControlBlockInner {
     pub is_zombie: bool,
-    pub(super) address_space: AddressSpace,
+    pub address_space: AddressSpace,
     pub parent: Option<Weak<ProcessControlBlock>>,
     /// 子进程，当前进程结束时，它们将被移交给 initproc
     pub children: Vec<Arc<ProcessControlBlock>>,
@@ -49,7 +45,7 @@ pub struct ProcessControlBlockInner {
 }
 
 impl ProcessControlBlock {
-    pub fn inner(&self) -> &UPSafeCell<ProcessControlBlockInner> {
+    pub fn inner(&self) -> &UpCell<ProcessControlBlockInner> {
         &self.inner
     }
 
@@ -65,8 +61,8 @@ impl ProcessControlBlock {
 
         let process = Arc::new(Self {
             pid: pid_handle,
-            inner: unsafe {
-                UPSafeCell::new(ProcessControlBlockInner {
+            inner: {
+                UpCell::new(ProcessControlBlockInner {
                     is_zombie: false,
                     address_space,
                     parent: None,
@@ -112,8 +108,8 @@ impl ProcessControlBlock {
 
         let child = Arc::new(Self {
             pid: alloc_pid(),
-            inner: unsafe {
-                UPSafeCell::new(ProcessControlBlockInner {
+            inner: {
+                UpCell::new(ProcessControlBlockInner {
                     is_zombie: false,
                     address_space: parent_inner.address_space.clone(),
                     parent: Some(Arc::downgrade(self)),

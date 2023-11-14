@@ -29,4 +29,12 @@ impl TaskContext {
             s: [0; 12],
         }
     }
+
+    pub const fn empty() -> Self {
+        Self {
+            ra: 0,
+            sp: 0,
+            s: [0; 12],
+        }
+    }
 }

@@ -79,6 +79,6 @@ pub fn sys_condvar_wait(id: usize, mutex_id: usize) -> isize {
     let condvar = process.inner().exclusive_access().condvar_list.get(id);
     let mutex = process.inner().exclusive_access().mutex_list.get(mutex_id);
     drop(process);
-    condvar.wait(mutex);
+    condvar.wait_with_mutex(mutex);
     0
 }

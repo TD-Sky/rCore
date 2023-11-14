@@ -1,9 +1,0 @@
-{
-  "lspconfig": {
-    "rust_analyzer": {
-      "rust-analyzer.checkOnSave.command": "clippy",
-      "rust-analyzer.checkOnSave.allTargets": false,
-      "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf"
-    }
-  }
-}

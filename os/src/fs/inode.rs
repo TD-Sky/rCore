@@ -6,25 +6,23 @@ use easy_fs::Inode;
 use easy_fs::Stat;
 use enumflags2::bitflags;
 use enumflags2::BitFlags;
-use lazy_static::lazy_static;
+use spin::Lazy;
 
 use super::File;
 use crate::drivers::BLOCK_DEVICE;
 use crate::memory::UserBuffer;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 
-lazy_static! {
-    static ref ROOT_INODE: Arc<Inode> = {
-        let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
-        Arc::new(EasyFileSystem::root_inode(&efs))
-    };
-}
+static ROOT_INODE: Lazy<Arc<Inode>> = Lazy::new(|| {
+    let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
+    Arc::new(EasyFileSystem::root_inode(&efs))
+});
 
 /// 表示进程打开的文件或目录
 pub struct OSInode {
     readable: bool,
     writable: bool,
-    inner: UPSafeCell<OSInodeInner>,
+    inner: UpCell<OSInodeInner>,
 }
 
 pub fn open_file(name: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
@@ -113,7 +111,7 @@ impl OSInode {
         Self {
             readable,
             writable,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { offset: 0, inode }) },
+            inner: UpCell::new(OSInodeInner { offset: 0, inode }),
         }
     }
 

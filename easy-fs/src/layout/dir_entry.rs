@@ -1,4 +1,4 @@
-use core::slice;
+use core::{ptr, slice};
 
 const NAME_MAX_LEN: usize = 27;
 
@@ -36,11 +36,11 @@ impl DirEntry {
 
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self as *const Self as usize as *const u8, Self::SIZE) }
+        unsafe { slice::from_raw_parts(ptr::from_ref(self).cast(), Self::SIZE) }
     }
 
     #[inline]
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self as *mut Self as usize as *mut u8, Self::SIZE) }
+        unsafe { slice::from_raw_parts_mut(ptr::from_mut(self).cast(), Self::SIZE) }
     }
 }

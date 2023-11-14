@@ -13,6 +13,12 @@ BOARD := qemu
 SBI ?= rustsbi
 BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
 
+# GUI
+GUI ?= off
+ifeq ($(GUI), off)
+	GUI_OPTION := -display none
+endif
+
 # Kernel entry
 KERNEL_ENTRY_PA := 0x80200000
 
@@ -20,21 +26,26 @@ KERNEL_ENTRY_PA := 0x80200000
 OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
+# 将硬盘 x0 作为一个 VirtIO 总线中的一个块设备接入到虚拟机系统中，
+#   		 -device virtio-net-device,netdev=net0 \
+#   		 -netdev user,id=net0,hostfwd=udp::6200-:2000,hostfwd=tcp::6201-:80
 QEMU_ARGS := -machine virt \
-			 -nographic \
 			 -bios $(BOOTLOADER) \
+			 -serial stdio \
+			 $(GUI_OPTION) \
 			 -device loader,file=$(KERNEL_ELF),addr=$(KERNEL_ENTRY_PA) \
 			 -drive file=$(FS_IMG),if=none,format=raw,id=x0 \
-			 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-			 # 将硬盘 x0 作为一个 VirtIO 总线中的一个块设备接入到虚拟机系统中，
-			 # virtio-mmio-bus.0 表示 VirtIO 总线通过 MMIO 进行控制，且该块设备在总线中的编号为0
+			 -device virtio-blk-device,drive=x0 \
+			 -device virtio-gpu-device \
+			 -device virtio-keyboard-device \
+			 -device virtio-mouse-device
 
-run: build pack-fs-img
+run: build fs-img
 	@qemu-system-riscv64 $(QEMU_ARGS)
 
 # -s 可以使 Qemu 监听本地 TCP 端口 1234 等待 GDB 客户端连接；
 # -S 可以使 Qemu 在收到 GDB 的请求后再开始运行。
-gdb-server: build pack-fs-img
+gdb-server: build fs-img
 	@qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
 gdb-client:
@@ -52,7 +63,7 @@ kernel:
 	@cargo build $(MODE_ARG)
 	@rm src/linker.ld
 
-pack-fs-img:
+fs-img:
 	@rm -rf $(FS_IMG)
 	@cd ../easy-fs-fuse && \
 		cargo run -r \
@@ -67,4 +78,4 @@ clean:
 	@cd ../user && cargo clean
 	@cd ../easy-fs-fuse && cargo clean
 
-.PHONY: build kernel clean run gdb-server gdb-client pack-fs-img
+.PHONY: build kernel clean run gdb-server gdb-client fs-img

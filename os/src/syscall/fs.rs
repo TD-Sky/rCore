@@ -167,7 +167,7 @@ pub fn sys_getdents(fd: usize, dents: *mut DirEntry, len: usize) -> isize {
 
     let read_byte_count = dir.read(UserBuffer::new(
         token,
-        dents as *mut u8,
+        dents.cast(),
         len * mem::size_of::<DirEntry>(),
     ));
 

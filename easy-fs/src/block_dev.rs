@@ -6,10 +6,9 @@
 //!
 //! `easy-fs` 可以通过块设备驱动读写块设备。
 
-use core::any::Any;
-
 /// 块设备驱动特质
-pub trait BlockDevice: Send + Sync + Any {
+pub trait BlockDevice: Send + Sync {
     fn read_block(&self, block_id: usize, buf: &mut [u8]);
     fn write_block(&self, block_id: usize, buf: &[u8]);
+    fn handle_irq(&self);
 }

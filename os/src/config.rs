@@ -1,6 +1,6 @@
 //! Constants used in rCore
 
-pub use crate::board::{CLOCK_FREQ, MEMORY_END, MMIO};
+pub use crate::board::{CLOCK_FREQ, MEMORY_END};
 
 pub const USER_STACK_SIZE: usize = 4096;
 pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
@@ -15,6 +15,11 @@ pub const PAGE_SIZE_BITS: usize = 12;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 /// Trap上下文地址的计算起点
 pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
+
+/// 显存所在的虚地址
+pub const FRAMEBUFFER_VA: usize = 0x1000_0000;
+
+pub static IMG_MOUSE: &[u8] = include_bytes!("../assets/mouse.bmp");
 
 /*
 * /// mmap距离堆底的偏移量，8G

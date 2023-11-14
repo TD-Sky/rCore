@@ -7,5 +7,5 @@ pub use self::{
     condvar::Condvar,
     mutex::{BlockMutex, Mutex, SpinMutex},
     semaphore::Semaphore,
-    up::UPSafeCell,
+    up::UpCell,
 };

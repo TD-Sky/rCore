@@ -1,4 +1,5 @@
 use core::arch::asm;
+use core::ptr;
 
 use easy_fs::{DirEntry, Stat};
 
@@ -43,6 +44,10 @@ const SEMAPHORE_DOWN: usize = 1022;
 const CONDVAR_CREATE: usize = 1030;
 const CONDVAR_SIGNAL: usize = 1031;
 const CONDVAR_WAIT: usize = 1032;
+const FRAMEBUFFER: usize = 2000;
+const FRAMEBUFFER_FLUSH: usize = 2001;
+const GET_EVENT: usize = 3000;
+const KEY_PRESSED: usize = 3001;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
@@ -165,7 +170,7 @@ pub fn sys_unlinkat(path: &str) -> isize {
 }
 
 pub fn sys_fstat(fd: usize, st: &mut Stat) -> isize {
-    syscall(FSTAT, [fd, st as *mut Stat as usize, 0])
+    syscall(FSTAT, [fd, ptr::from_mut(st) as usize, 0])
 }
 
 /// 将进程中一个已经打开的文件复制一份并分配到一个新的文件描述符中
@@ -289,4 +294,20 @@ pub fn sys_condvar_signal(id: usize) -> isize {
 
 pub fn sys_condvar_wait(id: usize, mutex_id: usize) -> isize {
     syscall(CONDVAR_WAIT, [id, mutex_id, 0])
+}
+
+pub fn sys_framebuffer() -> isize {
+    syscall(FRAMEBUFFER, [0, 0, 0])
+}
+
+pub fn sys_framebuffer_flush() -> isize {
+    syscall(FRAMEBUFFER_FLUSH, [0, 0, 0])
+}
+
+pub fn sys_get_event() -> isize {
+    syscall(GET_EVENT, [0, 0, 0])
+}
+
+pub fn sys_key_pressed() -> isize {
+    syscall(KEY_PRESSED, [0, 0, 0])
 }

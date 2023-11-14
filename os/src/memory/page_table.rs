@@ -136,9 +136,9 @@ impl PageTable {
         let indexes = vpn.indexes();
         let mut ppn = self.root;
 
-        for (_i, &index) in indexes.iter().take(2).enumerate() {
-            // debug!("level {} page table: {:#x}", i + 1, usize::from(ppn));
-            // debug!("level {} index: {:#x}", i + 1, index);
+        for (i, &index) in indexes.iter().take(2).enumerate() {
+            log::trace!("level {} page table: {:#x}", i + 1, usize::from(ppn));
+            log::trace!("level {} index: {:#x}", i + 1, index);
             let pte = &mut ppn.ptes_mut()[index];
             if !pte.is_valid() {
                 // 分配新的物理页，并让一/二级页表项指向此物理页。
@@ -209,8 +209,6 @@ impl Entry {
         self.flags().contains(PTEFlag::V)
     }
 }
-
-
 
 pub fn read_str(token: usize, src: *const u8) -> String {
     let page_table = PageTable::from_token(token);

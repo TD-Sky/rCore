@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use core::sync::atomic;
 use core::sync::atomic::AtomicUsize;
 
-use super::UPSafeCell;
+use super::UpCell;
 use crate::task;
 use crate::task::manager;
 use crate::task::processor;
@@ -11,14 +11,14 @@ use crate::task::TaskControlBlock;
 
 pub struct Semaphore {
     permits: AtomicUsize,
-    wait_queue: UPSafeCell<VecDeque<Arc<TaskControlBlock>>>,
+    wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
 impl Semaphore {
     pub fn new(permits: usize) -> Self {
         Self {
             permits: AtomicUsize::new(permits),
-            wait_queue: unsafe { UPSafeCell::new(VecDeque::new()) },
+            wait_queue: UpCell::new(VecDeque::new()),
         }
     }
 

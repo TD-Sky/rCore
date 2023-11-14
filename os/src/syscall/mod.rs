@@ -1,4 +1,6 @@
 mod fs;
+mod graph;
+mod input;
 mod process;
 mod sync;
 mod thread;
@@ -7,7 +9,7 @@ mod time;
 use easy_fs::DirEntry;
 use easy_fs::Stat;
 
-use self::{fs::*, process::*, sync::*, thread::*, time::*};
+use self::{fs::*, graph::*, input::*, process::*, sync::*, thread::*, time::*};
 use crate::task::signal::SignalAction;
 
 const DUP: usize = 24;
@@ -49,6 +51,10 @@ const SEMAPHORE_DOWN: usize = 1022;
 const CONDVAR_CREATE: usize = 1030;
 const CONDVAR_SIGNAL: usize = 1031;
 const CONDVAR_WAIT: usize = 1032;
+const FRAMEBUFFER: usize = 2000;
+const FRAMEBUFFER_FLUSH: usize = 2001;
+const GET_EVENT: usize = 3000;
+const KEY_PRESSED: usize = 3001;
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -95,6 +101,10 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         CONDVAR_CREATE => sys_condvar_create(),
         CONDVAR_SIGNAL => sys_condvar_signal(args[0]),
         CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
+        FRAMEBUFFER => sys_framebuffer(),
+        FRAMEBUFFER_FLUSH => sys_framebuffer_flush(),
+        GET_EVENT => sys_get_event(),
+        KEY_PRESSED => sys_key_pressed(),
         _ => panic!("Unsupported syscall ID: {id}"),
     }
 }

@@ -8,7 +8,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::cell::UnsafeCell;
-use lazy_static::lazy_static;
+use spin::Lazy;
 use user::sync::{
     condvar_create, condvar_signal, condvar_wait, mutex_lock, mutex_unlock, spin_mutex,
 };
@@ -54,10 +54,8 @@ impl Barrier {
 
 unsafe impl Sync for Barrier {}
 
-lazy_static! {
-    static ref BARRIER_AB: Barrier = Barrier::new();
-    static ref BARRIER_BC: Barrier = Barrier::new();
-}
+static BARRIER_AB: Lazy<Barrier> = Lazy::new(Barrier::new);
+static BARRIER_BC: Lazy<Barrier> = Lazy::new(Barrier::new);
 
 fn thread_fn() {
     for _ in 0..300 {

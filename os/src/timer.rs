@@ -9,22 +9,18 @@ use alloc::collections::BinaryHeap;
 use alloc::sync::Arc;
 use core::cmp::{Ordering, Reverse};
 
-use lazy_static::lazy_static;
 use riscv::register::time;
 
 use crate::config::CLOCK_FREQ;
 use crate::sbi::set_timer;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::task::{manager, TaskControlBlock};
 
 const TICKS_PRE_SEC: usize = 100;
 const MILLISECONDS: usize = 1000;
 /* const MICROSECONDS: usize = 1_000_000; */
 
-lazy_static! {
-    static ref TIMERS: UPSafeCell<BinaryHeap<TimerCondVar>> =
-        unsafe { UPSafeCell::new(BinaryHeap::new()) };
-}
+static TIMERS: UpCell<BinaryHeap<TimerCondVar>> = UpCell::new(BinaryHeap::new());
 
 /// read the `mtime` register
 pub fn get_time() -> usize {

@@ -7,7 +7,7 @@ use enumflags2::BitFlags;
 
 use super::File;
 use crate::memory::UserBuffer;
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::task;
 use crate::task::manager;
 use crate::task::processor;
@@ -30,12 +30,12 @@ pub fn new(count: u64, flags: BitFlags<EventFdFlag>) -> Arc<dyn File + Send + Sy
     match (semaphore, non_block) {
         (false, false) => Arc::new(EventFdContext {
             count,
-            wait_queue: unsafe { UPSafeCell::new(VecDeque::new()) },
+            wait_queue: UpCell::new(VecDeque::new()),
         }),
         (false, true) => Arc::new(NonBlockEventFdContext { count }),
         (true, false) => Arc::new(SemEventFdContext {
             count,
-            wait_queue: unsafe { UPSafeCell::new(VecDeque::new()) },
+            wait_queue: UpCell::new(VecDeque::new()),
         }),
         (true, true) => Arc::new(SemNonBlockEventFdContext { count }),
     }
@@ -43,7 +43,7 @@ pub fn new(count: u64, flags: BitFlags<EventFdFlag>) -> Arc<dyn File + Send + Sy
 
 struct EventFdContext {
     count: AtomicU64,
-    wait_queue: UPSafeCell<VecDeque<Arc<TaskControlBlock>>>,
+    wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
 struct NonBlockEventFdContext {
@@ -52,7 +52,7 @@ struct NonBlockEventFdContext {
 
 struct SemEventFdContext {
     count: AtomicU64,
-    wait_queue: UPSafeCell<VecDeque<Arc<TaskControlBlock>>>,
+    wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
 struct SemNonBlockEventFdContext {
@@ -265,7 +265,7 @@ impl File for SemNonBlockEventFdContext {
     }
 }
 
-fn wait(queue: &UPSafeCell<VecDeque<Arc<TaskControlBlock>>>) {
+fn wait(queue: &UpCell<VecDeque<Arc<TaskControlBlock>>>) {
     queue
         .exclusive_access()
         .push_back(processor::current_task().unwrap());

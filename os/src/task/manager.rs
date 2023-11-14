@@ -2,18 +2,13 @@
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::sync::Arc;
-use lazy_static::lazy_static;
 
 use super::{ProcessControlBlock, TaskControlBlock, TaskStatus};
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::timer;
 
-lazy_static! {
-    static ref TASK_MANAGER: UPSafeCell<TaskManager> =
-        unsafe { UPSafeCell::new(TaskManager::default()) };
-    static ref PID2TCB: UPSafeCell<BTreeMap<usize, Arc<ProcessControlBlock>>> =
-        unsafe { UPSafeCell::new(BTreeMap::new()) };
-}
+static TASK_MANAGER: UpCell<TaskManager> = UpCell::new(TaskManager::new());
+static PID2TCB: UpCell<BTreeMap<usize, Arc<ProcessControlBlock>>> = UpCell::new(BTreeMap::new());
 
 pub fn add_task(task: Arc<TaskControlBlock>) {
     TASK_MANAGER.exclusive_access().add(task);
@@ -31,9 +26,7 @@ pub fn remove_task(task: &Arc<TaskControlBlock>) {
 }
 
 pub fn wakeup_task(task: Arc<TaskControlBlock>) {
-    let mut task_inner = task.inner().exclusive_access();
-    task_inner.status = TaskStatus::Ready;
-    drop(task_inner);
+    task.inner().exclusive_access().status = TaskStatus::Ready;
     add_task(task);
 }
 
@@ -58,6 +51,12 @@ struct TaskManager {
 }
 
 impl TaskManager {
+    const fn new() -> Self {
+        Self {
+            ready_queue: VecDeque::new(),
+        }
+    }
+
     fn add(&mut self, task: Arc<TaskControlBlock>) {
         self.ready_queue.push_back(task);
     }

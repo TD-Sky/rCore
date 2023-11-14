@@ -2,13 +2,15 @@
 #![no_main]
 #![feature(format_args_nl)]
 
-use enumflags2::BitFlags;
-use user::fs::{close, eventfd, eventfd_read, eventfd_write};
-use user::thread::{exit, waittid};
-
 #[macro_use]
 extern crate user;
 extern crate alloc;
+
+use core::ptr;
+
+use enumflags2::BitFlags;
+use user::fs::{close, eventfd, eventfd_read, eventfd_write};
+use user::thread::{exit, waittid};
 
 struct WriteArg {
     fd: usize,
@@ -50,8 +52,8 @@ fn main() -> i32 {
     };
 
     let threads = [
-        user::thread::spawn(reader as usize, &rarg as *const _ as usize),
-        user::thread::spawn(writer as usize, &warg as *const _ as usize),
+        user::thread::spawn(reader as usize, ptr::from_ref(&rarg) as usize),
+        user::thread::spawn(writer as usize, ptr::from_ref(&warg) as usize),
     ];
     for tid in threads {
         waittid(tid);

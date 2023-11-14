@@ -24,10 +24,13 @@ use riscv::register::scause::Exception;
 use riscv::register::scause::Interrupt;
 use riscv::register::scause::Trap;
 use riscv::register::sie;
+use riscv::register::sscratch;
+use riscv::register::sstatus;
 use riscv::register::stval;
 use riscv::register::stvec;
 use riscv::register::utvec::TrapMode;
 
+use crate::board;
 use crate::config::TRAMPOLINE;
 use crate::syscall::syscall;
 use crate::task;
@@ -39,6 +42,7 @@ global_asm!(include_str!("trap.S"));
 
 extern "C" {
     fn __alltraps();
+    fn __alltraps_k();
     fn __restore();
 }
 
@@ -46,14 +50,11 @@ pub fn init() {
     set_kernel_trap_entry();
 }
 
-#[no_mangle]
-fn trap_from_kernel() -> ! {
-    panic!("A trap from kernel!");
-}
-
 fn set_kernel_trap_entry() {
+    let alltraps_k_va = TRAMPOLINE + (__alltraps_k as usize - __alltraps as usize);
     unsafe {
-        stvec::write(trap_from_kernel as usize, TrapMode::Direct);
+        stvec::write(alltraps_k_va, TrapMode::Direct);
+        sscratch::write(trap_from_kernel as usize);
     }
 }
 
@@ -86,6 +87,7 @@ pub fn trap_handler() -> ! {
     // Supervisor Exception Casue
     // 记录发生的异常
     let scause = scause::read();
+    let cause = scause.cause();
 
     // Supervisor Trap Value
     // | 地址异常 => 该地址
@@ -93,7 +95,7 @@ pub fn trap_handler() -> ! {
     // | _ => 0
     let stval = stval::read();
 
-    match scause.cause() {
+    match cause {
         Trap::Exception(Exception::UserEnvCall) => {
             // Trap上下文不在内核地址空间内，要间接获取
             let ctx = processor::current_trap_ctx();
@@ -101,6 +103,11 @@ pub fn trap_handler() -> ! {
             // 希望 sepc 可以指向 ecall 的下一条指令
             // (RISC-V 64 指令长度不超过 32 位)
             ctx.sepc += 4;
+
+            unsafe {
+                sstatus::set_sie();
+            }
+
             let result = syscall(ctx.arg(7), [ctx.arg(0), ctx.arg(1), ctx.arg(2)]);
 
             // 原来的Trap上下文在 sys_exec 时被回收，需获取新的Trap上下文
@@ -117,9 +124,7 @@ pub fn trap_handler() -> ! {
             | Exception::LoadPageFault
             | Exception::InstructionFault
             | Exception::InstructionPageFault,
-        ) => {
-            task::send_signal_to_current(SignalFlag::SIGSEGV);
-        }
+        ) => task::send_signal_to_current(SignalFlag::SIGSEGV),
 
         Trap::Exception(Exception::IllegalInstruction) => {
             task::send_signal_to_current(SignalFlag::SIGILL);
@@ -131,11 +136,9 @@ pub fn trap_handler() -> ! {
             task::suspend_current_and_run_next();
         }
 
-        _ => panic!(
-            "Unsupported trap {:?}, stval = {:#x}!",
-            scause.cause(),
-            stval
-        ),
+        Trap::Interrupt(Interrupt::SupervisorExternal) => board::irq_handler(),
+
+        _ => panic!("Unsupported trap {cause:?}, stval = {stval:#x}!"),
     }
 
     /* task::handle_signals(); */
@@ -151,6 +154,9 @@ pub fn trap_handler() -> ! {
 /// 结束Trap处理环节，跳转到恢复函数
 #[no_mangle]
 pub fn trap_return() -> ! {
+    unsafe {
+        sstatus::clear_sie();
+    }
     set_user_trap_entry();
 
     // TRAMPOLINE 运行时地址
@@ -176,5 +182,22 @@ pub fn trap_return() -> ! {
             in("a1") user_satp,
             options(noreturn)
         );
+    }
+}
+
+#[no_mangle]
+fn trap_from_kernel() {
+    let scause = scause::read();
+    let stval = stval::read();
+    let casue = scause.cause();
+
+    match casue {
+        Trap::Interrupt(Interrupt::SupervisorTimer) => {
+            timer::set_next_trigger();
+            timer::wakeup_timeout_tasks();
+            // 内核不做时间片轮换
+        }
+        Trap::Interrupt(Interrupt::SupervisorExternal) => board::irq_handler(),
+        _ => panic!("Unsupported trap from kernel: {casue:?}, stval = {stval:#x}"),
     }
 }

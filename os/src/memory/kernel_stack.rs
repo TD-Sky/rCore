@@ -1,18 +1,13 @@
 //! 内核空间的用户内核栈
 
-use lazy_static::lazy_static;
-
 use super::address::VirtAddr;
 use super::MapPermission;
 use super::KERNEL_SPACE;
 use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE};
-use crate::sync::UPSafeCell;
+use crate::sync::UpCell;
 use crate::task::RecycleAllocator;
 
-lazy_static! {
-    static ref KSTACK_ALLOCATOR: UPSafeCell<RecycleAllocator> =
-        unsafe { UPSafeCell::new(RecycleAllocator::default()) };
-}
+static KSTACK_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 
 pub struct KernelStack(usize);
 

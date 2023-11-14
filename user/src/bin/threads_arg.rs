@@ -7,6 +7,8 @@ extern crate user;
 extern crate alloc;
 
 use alloc::vec::Vec;
+use core::ptr;
+
 use user::thread::{self, exit, waittid};
 
 struct Argument {
@@ -33,7 +35,7 @@ fn main() -> i32 {
     for arg in &args {
         v.push(thread::spawn(
             thread_print as usize,
-            arg as *const _ as usize,
+            ptr::from_ref(arg) as usize,
         ));
     }
     for tid in v {
