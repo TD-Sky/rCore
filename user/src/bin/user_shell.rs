@@ -4,9 +4,7 @@
 #![feature(format_args_nl)]
 
 extern crate alloc;
-use alloc::borrow::ToOwned;
 use alloc::string::String;
-use core::ptr;
 
 #[macro_use]
 extern crate user;
@@ -124,7 +122,6 @@ struct ProcessArgs {
     input: Option<String>,
     output: Option<String>,
     args: Vec<String>,
-    argv: Vec<*const u8>,
 }
 
 impl ProcessArgs {
@@ -132,30 +129,26 @@ impl ProcessArgs {
         let mut args: Vec<String> = command
             .split_whitespace()
             .filter(|arg| !arg.is_empty())
-            .map(|arg| arg.to_owned() + "\0")
+            .map(String::from)
             .collect();
 
-        let input = args.iter().position(|arg| arg == "<\0").map(|i| {
+        let input = args.iter().position(|arg| arg == "<").map(|i| {
             let input = args[i + 1].clone();
             // 带上重定向符后的文件名
             args.drain(i..=i + 1);
             input
         });
 
-        let output = args.iter().position(|arg| arg == ">\0").map(|i| {
+        let output = args.iter().position(|arg| arg == ">").map(|i| {
             let output = args[i + 1].clone();
             args.drain(i..=i + 1);
             output
         });
 
-        let mut argv: Vec<*const u8> = args.iter().map(|arg| arg.as_ptr()).collect();
-        argv.push(ptr::null());
-
         Self {
             input,
             output,
             args,
-            argv,
         }
     }
 }
@@ -236,7 +229,8 @@ fn sub_process(i: usize, process_args: &ProcessArgs, pipes: &[Pipe], end: usize)
         close(pipe[1]).unwrap();
     }
 
-    if exec(&process_args.args[0], &process_args.argv).is_none() {
+    let (cmd, args) = process_args.args.split_first().unwrap();
+    if exec(cmd, args).is_none() {
         println!("Error when executing!");
         return Err(-4);
     }

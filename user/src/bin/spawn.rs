@@ -9,7 +9,7 @@ extern crate user;
 
 #[no_mangle]
 fn main() -> i32 {
-    let child = "matrix\0";
+    let child = "matrix";
     let sub_pid = spawn(child).unwrap();
     let mut xstate = 0;
 

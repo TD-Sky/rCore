@@ -2,23 +2,21 @@
 #![no_main]
 #![feature(format_args_nl)]
 
-use core::ptr;
-
 use user::println;
 use user::process::{exec, fork, waitpid};
 
 static TESTS: &[&str] = &[
-    "exit\0",
-    "fantastic_text\0",
-    "forktest\0",
-    "forktest2\0",
-    "forktest_simple\0",
-    "hello_world\0",
-    "matrix\0",
-    "sleep\0",
-    "sleep_simple\0",
-    "stack_overflow\0",
-    "yield\0",
+    "exit",
+    "fantastic_text",
+    "forktest",
+    "forktest2",
+    "forktest_simple",
+    "hello_world",
+    "matrix",
+    "sleep",
+    "sleep_simple",
+    "stack_overflow",
+    "yield",
 ];
 
 #[no_mangle]
@@ -27,7 +25,7 @@ fn main() -> i32 {
         println!("Usertests: Running {test}");
         let pid = fork();
         if pid == 0 {
-            exec(test, &[ptr::null()]);
+            exec::<&str, _>(test, []);
             panic!("unreachable!");
         } else {
             let mut exit_code: i32 = Default::default();

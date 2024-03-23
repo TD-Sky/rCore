@@ -14,7 +14,7 @@ use user::println;
 fn main(argc: usize, _argv: &[&str]) -> i32 {
     // 截至2023-09-02，不允许指定参数
     assert_eq!(argc, 1);
-    let fd = open("/\0", OpenFlag::read_only()).expect("File not found");
+    let fd = open("/", OpenFlag::read_only()).expect("File not found");
     let mut dents = vec![DirEntry::default(); 64];
     let nread = getdents(fd, &mut dents).expect("Not a directory");
     let s = dents[..nread]

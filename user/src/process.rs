@@ -1,3 +1,6 @@
+use alloc::ffi::CString;
+use alloc::vec::Vec;
+
 use crate::status2option;
 use crate::syscall::*;
 use crate::thread::yield_;
@@ -12,15 +15,31 @@ pub fn fork() -> usize {
 
 /// 结果：
 /// None => 程序不存在
-pub fn exec(path: &str, args: &[*const u8]) -> Option<!> {
-    match sys_exec(path, args) {
+pub fn exec<S, I>(path: &str, args: I) -> Option<!>
+where
+    S: AsRef<str>,
+    I: IntoIterator<Item = S>,
+{
+    let path = CString::new(path).unwrap();
+    let args = args
+        .into_iter()
+        .map(|s| CString::new(s.as_ref()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let args: Vec<_> = args
+        .iter()
+        .map(|s| s.as_c_str().as_ptr())
+        .chain([c"".as_ptr()])
+        .collect();
+    match sys_exec(&path, &args) {
         -1 => None,
         _ => unreachable!(),
     }
 }
 
 pub fn spawn(path: &str) -> Option<usize> {
-    status2option(sys_spawn(path))
+    let path = CString::new(path).unwrap();
+    status2option(sys_spawn(&path))
 }
 
 /// 等待任意一个子进程结束

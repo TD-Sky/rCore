@@ -2,8 +2,6 @@
 #![no_main]
 #![feature(format_args_nl)]
 
-use core::ptr;
-
 use user::println;
 use user::process::{exec, fork, wait};
 use user::thread::yield_;
@@ -12,7 +10,7 @@ use user::thread::yield_;
 fn main() -> i32 {
     if fork() == 0 {
         // 启动shell
-        exec("user_shell\0", &[ptr::null()]);
+        exec::<&str, _>("user_shell", []);
     } else {
         loop {
             let mut exit_code = 0;

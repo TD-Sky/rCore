@@ -1,3 +1,4 @@
+use alloc::ffi::CString;
 use easy_fs::{DirEntry, Stat};
 use enumflags2::{bitflags, BitFlags};
 
@@ -40,7 +41,8 @@ pub enum EventFdFlag {
 }
 
 pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<usize> {
-    status2option(sys_open(path, flags.bits()))
+    let path = CString::new(path).unwrap();
+    status2option(sys_open(&path, flags.bits()))
 }
 
 pub fn close(fd: usize) -> Option<()> {
@@ -56,11 +58,14 @@ pub fn dup(fd: usize) -> Option<usize> {
 }
 
 pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
-    sys_linkat(old_path, new_path).eq(&0).then_some(())
+    let old_path = CString::new(old_path).unwrap();
+    let new_path = CString::new(new_path).unwrap();
+    sys_linkat(&old_path, &new_path).eq(&0).then_some(())
 }
 
 pub fn remove(path: &str) -> Option<()> {
-    sys_unlinkat(path).eq(&0).then_some(())
+    let path = CString::new(path).unwrap();
+    sys_unlinkat(&path).eq(&0).then_some(())
 }
 
 pub fn fstat(fd: usize) -> Option<Stat> {

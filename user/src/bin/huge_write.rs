@@ -14,7 +14,7 @@ fn main() -> i32 {
     for (i, ch) in buffer.iter_mut().enumerate() {
         *ch = i as u8;
     }
-    let fd = open("testf\0", OpenFlag::CREATE | OpenFlag::WRONLY).unwrap();
+    let fd = open("testf", OpenFlag::CREATE | OpenFlag::WRONLY).unwrap();
     let start = get_time();
 
     let size_mb = 1usize;

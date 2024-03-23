@@ -12,7 +12,7 @@ use user::io::{read, write};
 #[no_mangle]
 fn main() -> i32 {
     let test_str = "Hello, world!";
-    let filea = "filea\0";
+    let filea = "filea";
     let fd = open(filea, OpenFlag::CREATE | OpenFlag::WRONLY).unwrap();
     write(fd, test_str.as_bytes()).unwrap();
     close(fd).unwrap();

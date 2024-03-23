@@ -1,4 +1,5 @@
 use core::arch::asm;
+use core::ffi::{c_char, CStr};
 use core::ptr;
 
 use easy_fs::{DirEntry, Stat};
@@ -64,7 +65,7 @@ fn syscall(id: usize, args: [usize; 3]) -> isize {
     ret
 }
 
-pub fn sys_open(path: &str, flags: u32) -> isize {
+pub fn sys_open(path: &CStr, flags: u32) -> isize {
     syscall(OPEN, [path.as_ptr() as usize, flags as usize, 0])
 }
 
@@ -134,7 +135,7 @@ pub fn sys_fork() -> isize {
     syscall(FORK, [0, 0, 0])
 }
 
-pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
+pub fn sys_exec(path: &CStr, args: &[*const c_char]) -> isize {
     syscall(EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0])
 }
 
@@ -154,18 +155,18 @@ pub fn sys_eventfd(initval: u64, flags: u32) -> isize {
     syscall(EVENTFD, [initval as usize, flags as usize, 0])
 }
 
-pub fn sys_spawn(path: &str) -> isize {
+pub fn sys_spawn(path: &CStr) -> isize {
     syscall(SPAWN, [path.as_ptr() as usize, 0, 0])
 }
 
-pub fn sys_linkat(oldpath: &str, newpath: &str) -> isize {
+pub fn sys_linkat(oldpath: &CStr, newpath: &CStr) -> isize {
     syscall(
         LINKAT,
         [oldpath.as_ptr() as usize, newpath.as_ptr() as usize, 0],
     )
 }
 
-pub fn sys_unlinkat(path: &str) -> isize {
+pub fn sys_unlinkat(path: &CStr) -> isize {
     syscall(UNLINKAT, [path.as_ptr() as usize, 0, 0])
 }
 
