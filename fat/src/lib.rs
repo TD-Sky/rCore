@@ -2,10 +2,13 @@
 
 use core::num::{NonZeroU16, NonZeroU32};
 
+use binrw::binrw;
+use binrw::{BinRead, BinWrite};
+
 /// BIOS Parameter Block BIOS参数块
 /// 位于保留区的第一扇区，该扇区又名启动扇区。
 #[derive(Debug)]
-#[repr(C)]
+#[binrw]
 pub struct Bpb {
     /// 跳转至启动代码的指令
     _bs_jmp_boot: [u8; 3],
@@ -95,7 +98,9 @@ pub struct Bpb {
 }
 /* 扇区剩余部分皆填0x00 */
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[br(repr = u16)]
+#[bw(repr = u16)]
 #[repr(u16)]
 pub enum SectorBytes {
     B512 = 512,
@@ -104,7 +109,9 @@ pub enum SectorBytes {
     B4096 = 4096,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[br(repr = u8)]
+#[bw(repr = u8)]
 #[repr(u8)]
 pub enum ClusterSectors {
     S1 = 1,
@@ -117,14 +124,18 @@ pub enum ClusterSectors {
     S128 = 128,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[br(repr = u8)]
+#[bw(repr = u8)]
 #[repr(u8)]
 pub enum Media {
     Fixed = 0xF8,
     Removable = 0xF0,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[br(repr = u8)]
+#[bw(repr = u8)]
 #[repr(u8)]
 pub enum BootSignature {
     Set = 0x29,
