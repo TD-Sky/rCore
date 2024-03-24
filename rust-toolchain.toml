@@ -2,7 +2,7 @@
 channel = "nightly"
 components = [
   "rust-src",
-  "llvm-tools-preview",
+  "llvm-tools",
   "rustfmt",
   "clippy",
   "rust-analyzer",
