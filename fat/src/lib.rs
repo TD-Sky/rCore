@@ -17,10 +17,10 @@ pub struct Bpb {
     bs_oem_name: [u8; 8],
 
     /// 一个扇区的字节量
-    byte_per_sec: SectorBytes,
+    byts_per_sec: SectorBytes,
 
     /// 一个簇的扇区数
-    sector_per_clus: ClusterSectors,
+    sec_per_clus: ClusterSectors,
 
     /// TODO: 对齐用
     rsvd_sec_cnt: NonZeroU16,
@@ -109,11 +109,12 @@ pub enum SectorBytes {
     B4096 = 4096,
 }
 
-#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BinRead, BinWrite)]
 #[br(repr = u8)]
 #[bw(repr = u8)]
 #[repr(u8)]
 pub enum ClusterSectors {
+    S0 = 0,
     S1 = 1,
     S2 = 2,
     S4 = 4,
@@ -141,3 +142,30 @@ pub enum BootSignature {
     Set = 0x29,
     Unset = 0x00,
 }
+
+#[derive(Debug)]
+pub struct DiskSz2SecPerClus<const N: usize> {
+    base: [(usize, ClusterSectors); N],
+}
+
+impl<const N: usize> DiskSz2SecPerClus<N> {
+    pub fn get(&self, disk_size: usize) -> ClusterSectors {
+        self.base
+            .iter()
+            .find(|(dsz, _)| disk_size <= *dsz)
+            .unwrap_or(self.base.last().unwrap())
+            .1
+    }
+}
+
+#[rustfmt::skip]
+static DiskSz2SecPerClusFat32: DiskSz2SecPerClus<6> = DiskSz2SecPerClus {
+    base: [
+        (66600,      ClusterSectors::S0),   // <= 32.5 MiB => 0 value for SecPerClusVal trips an error
+        (532480,     ClusterSectors::S1),   // <= 260  MiB => 0.5k cluster
+        (16777216,   ClusterSectors::S8),   // <= 8    GiB => 4k   cluster
+        (33554432,   ClusterSectors::S16),  // <= 16   GB  => 8k   cluster
+        (67108864,   ClusterSectors::S32),  // <= 32   GB  => 16k  cluster
+        (usize::MAX, ClusterSectors::S64),  // >  32   GB  => 32k  cluster
+    ],
+};
