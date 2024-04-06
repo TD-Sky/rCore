@@ -96,9 +96,10 @@ pub struct Bpb {
     /// [0x55, 0xAA]
     signature_word: [u8; 2],
 }
+
 /* 扇区剩余部分皆填0x00 */
 
-#[derive(Debug, PartialEq, Eq, BinRead, BinWrite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BinRead, BinWrite)]
 #[br(repr = u16)]
 #[bw(repr = u16)]
 #[repr(u16)]
@@ -143,6 +144,13 @@ pub enum BootSignature {
     Unset = 0x00,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum FatType {
+    T12,
+    T16,
+    T32,
+}
+
 #[derive(Debug)]
 pub struct DiskSz2SecPerClus<const N: usize> {
     base: [(usize, ClusterSectors); N],
@@ -169,3 +177,60 @@ static DiskSz2SecPerClusFat32: DiskSz2SecPerClus<6> = DiskSz2SecPerClus {
         (usize::MAX, ClusterSectors::S64),  // >  32   GB  => 32k  cluster
     ],
 };
+
+impl Bpb {
+    const fn root_dir_sectors(&self) -> u16 {
+        (self._root_ent_cnt * 32 + (self.byts_per_sec as u16 - 1)) / self.byts_per_sec as u16
+    }
+
+    /// 计算FAT占用扇区数并设置
+    fn set_fat_size(&mut self, disk_size: usize) {
+        let tmp1 = disk_size - (self.rsvd_sec_cnt.get() + self.root_dir_sectors()) as usize;
+        let mut tmp2 = 256 * self.sec_per_clus as u8 as usize + self.num_fats as usize;
+
+        if self.fil_sys_type.starts_with(b"FAT32") {
+            tmp2 /= 2;
+        }
+        let fat_size = (tmp1 + tmp2 - 1) / tmp2;
+
+        if self.fil_sys_type.starts_with(b"FAT32") {
+            self._fat_sz16 = 0;
+            self.fat_sz32 = (fat_size as u32).try_into().unwrap();
+        } else {
+            self._fat_sz16 = fat_size as u16;
+        }
+    }
+
+    const fn fat_size(&self) -> usize {
+        if self._fat_sz16 > 0 {
+            self._fat_sz16 as usize
+        } else {
+            self.fat_sz32.get() as usize
+        }
+    }
+
+    const fn total_sectors(&self) -> usize {
+        if self._tot_sec16 > 0 {
+            self._tot_sec16 as usize
+        } else {
+            self.tot_sec32.get() as usize
+        }
+    }
+
+    /// Required: the FAT size is known
+    const fn fat_type(&self) -> FatType {
+        let data_sec = self.total_sectors()
+            - (self.rsvd_sec_cnt.get() as usize
+                + self.num_fats as usize * self.fat_size()
+                + self.root_dir_sectors() as usize);
+        let clusters = data_sec / self.sec_per_clus as u8 as usize;
+
+        if clusters <= 4084 {
+            FatType::T12
+        } else if clusters <= 65524 {
+            FatType::T16
+        } else {
+            FatType::T32
+        }
+    }
+}
