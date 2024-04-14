@@ -1,6 +1,6 @@
 #![no_std]
 
-mod bpb;
 mod dir_entry;
+pub mod volume;
 
-pub(crate) use self::{bpb::Bpb, dir_entry::DirEntry};
+pub(crate) use self::dir_entry::DirEntry;
