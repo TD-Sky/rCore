@@ -6,13 +6,13 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use block_dev::BlockDevice;
 use enumflags2::bitflags;
 use spin::Mutex;
 
 use crate::block_cache;
 use crate::layout::DirEntry;
 use crate::layout::{DiskInode, DiskInodeKind};
-use crate::BlockDevice;
 use crate::EasyFileSystem;
 
 pub struct Inode {

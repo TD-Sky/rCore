@@ -13,9 +13,9 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
 
+use block_dev::BlockDevice;
 use spin::Mutex;
 
-use crate::BlockDevice;
 use crate::BLOCK_SIZE;
 
 static BLOCK_CACHE_MANAGER: Mutex<BlockCacheManager> = Mutex::new(BlockCacheManager::new());

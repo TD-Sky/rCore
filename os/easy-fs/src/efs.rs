@@ -5,11 +5,11 @@
 use core::mem;
 
 use alloc::sync::Arc;
+use block_dev::BlockDevice;
 use spin::Mutex;
 
 use crate::block_cache;
 use crate::layout::*;
-use crate::BlockDevice;
 use crate::DataBlock;
 use crate::Inode;
 use crate::{BLOCK_BITS, BLOCK_SIZE};

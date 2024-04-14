@@ -1,6 +1,6 @@
 use alloc::collections::BTreeMap;
 
-use easy_fs::BlockDevice;
+use block_dev::BlockDevice;
 use virtio_drivers::{BlkResp, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use super::{IOMode, DEV_IO_MODE};

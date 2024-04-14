@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
+use block_dev::BlockDevice;
 
 use crate::block_cache;
-use crate::BlockDevice;
 use crate::BLOCK_BITS;
 
 /// 位图区域内块的结构

@@ -21,6 +21,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "block-dev"
+version = "0.1.0"
+
+[[package]]
 name = "buddy_system_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -45,6 +49,7 @@ checksum = "7059fff8937831a9ae6f0fe4d658ffabf58f2ca96aa9dec1c889f936f705f216"
 name = "easy-fs"
 version = "0.1.0"
 dependencies = [
+ "block-dev",
  "enumflags2",
  "log",
  "spin",
@@ -130,6 +135,7 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "block-dev",
  "buddy_system_allocator",
  "easy-fs",
  "embedded-graphics",

@@ -2,7 +2,7 @@ mod virtio_blk;
 
 use alloc::sync::Arc;
 
-use easy_fs::BlockDevice;
+use block_dev::BlockDevice;
 use spin::Lazy;
 
 use crate::sync::UpCell;
