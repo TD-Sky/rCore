@@ -1,0 +1,17 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+easy-fs = { workspace = true }
+buddy_system_allocator = { workspace = true }
+enumflags2 = { workspace = true }
+log = { workspace = true }
+riscv = { workspace = true }
+sbi-rt = { workspace = true, features = ["legacy"] }
+spin = { workspace = true, features = ["lazy"] }
+tinybmp = { workspace = true }
+embedded-graphics = { workspace = true }
+goblin = { workspace = true, features = ["elf64", "elf32", "endian_fd"] }
+virtio-drivers = { workspace = true }

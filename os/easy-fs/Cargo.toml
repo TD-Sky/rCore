@@ -1,0 +1,9 @@
+[package]
+name = "easy-fs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enumflags2 = { workspace = true }
+log = { workspace = true }
+spin = { workspace = true, features = ["mutex", "spin_mutex"] }

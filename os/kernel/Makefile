@@ -1,8 +1,9 @@
 # Building
+ROOT := $(abspath ../..)
 TARGET := riscv64gc-unknown-none-elf
 MODE := release
-KERNEL_ELF := target/$(TARGET)/$(MODE)/os
-FS_IMG := ../easy-fs-fuse/target/fs.img
+KERNEL_ELF := $(ROOT)/os/target/$(TARGET)/$(MODE)/kernel
+FS_IMG := $(ROOT)/easy-fs-fuse/target/fs.img
 
 ifeq ($(MODE), release)
 	MODE_ARG := --release
@@ -11,7 +12,7 @@ endif
 # Board
 BOARD := qemu
 SBI ?= rustsbi
-BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
+BOOTLOADER := $(ROOT)/bootloader/$(SBI)-$(BOARD).bin
 
 # GUI
 GUI ?= off
@@ -57,7 +58,7 @@ gdb-client:
 build: kernel
 
 kernel:
-	@cd ../user && cargo build --release
+	@cd $(ROOT)/user && cargo build --release
 	@echo Platfrom: $(BOARD)
 	@cp src/linker-$(BOARD).ld src/linker.ld
 	@cargo build $(MODE_ARG)
@@ -65,17 +66,17 @@ kernel:
 
 fs-img:
 	@rm -rf $(FS_IMG)
-	@cd ../easy-fs-fuse && \
+	@cd $(ROOT)/easy-fs-fuse && \
 		cargo run -r \
 			--bin easy-fs-packer \
 			-- \
-			-s ../user/src/bin \
-			-t ../user/target/riscv64gc-unknown-none-elf/release \
+			-s $(ROOT)/user/src/bin \
+			-t $(ROOT)/user/target/riscv64gc-unknown-none-elf/release \
 			-O ./target
 
 clean:
 	@cargo clean
-	@cd ../user && cargo clean
-	@cd ../easy-fs-fuse && cargo clean
+	@cd $(ROOT)/user && cargo clean
+	@cd $(ROOT)/easy-fs-fuse && cargo clean
 
 .PHONY: build kernel clean run gdb-server gdb-client fs-img

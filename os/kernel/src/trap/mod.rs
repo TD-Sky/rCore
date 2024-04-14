@@ -19,6 +19,7 @@ pub use self::context::TrapContext;
 use core::arch::asm;
 use core::arch::global_asm;
 
+use riscv::register::mtvec::TrapMode;
 use riscv::register::scause;
 use riscv::register::scause::Exception;
 use riscv::register::scause::Interrupt;
@@ -28,7 +29,6 @@ use riscv::register::sscratch;
 use riscv::register::sstatus;
 use riscv::register::stval;
 use riscv::register::stvec;
-use riscv::register::utvec::TrapMode;
 
 use crate::board;
 use crate::config::TRAMPOLINE;
