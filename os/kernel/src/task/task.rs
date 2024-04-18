@@ -12,6 +12,7 @@ use crate::memory::MapPermission;
 use crate::sync::UpCell;
 use crate::trap::TrapContext;
 
+#[derive(Debug)]
 pub struct TaskControlBlock {
     // immutable
     pub process: Weak<ProcessControlBlock>,
@@ -20,6 +21,7 @@ pub struct TaskControlBlock {
     inner: UpCell<TaskControlBlockInner>,
 }
 
+#[derive(Debug)]
 pub struct TaskControlBlockInner {
     pub resource: TaskUserResource,
     pub(super) trap_ctx_ppn: PhysPageNum,
@@ -30,13 +32,14 @@ pub struct TaskControlBlockInner {
 
 /// 线程资源：线程ID 与 用户栈
 // 进程用于 分配/释放 资源
+#[derive(Debug)]
 pub struct TaskUserResource {
     pub tid: usize,
     pub user_stack_base: usize,
     process: Weak<ProcessControlBlock>,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TaskStatus {
     Ready,
     Running,

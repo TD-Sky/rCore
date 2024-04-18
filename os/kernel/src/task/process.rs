@@ -18,14 +18,17 @@ use crate::trap::{trap_handler, TrapContext};
 
 static PID_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 
+#[derive(Debug)]
 pub struct ProcessControlBlock {
     pid: PidHandle,
     inner: UpCell<ProcessControlBlockInner>,
 }
 
 /// 进程描述符
+#[derive(Debug)]
 pub struct PidHandle(usize);
 
+#[derive(Debug)]
 pub struct ProcessControlBlockInner {
     pub is_zombie: bool,
     pub address_space: AddressSpace,

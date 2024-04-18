@@ -1,5 +1,6 @@
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
+use core::fmt::Debug;
 use core::sync::atomic;
 use core::sync::atomic::AtomicBool;
 
@@ -9,15 +10,17 @@ use crate::task::manager;
 use crate::task::processor;
 use crate::task::TaskControlBlock;
 
-pub trait Mutex: Send + Sync {
+pub trait Mutex: Debug + Send + Sync {
     fn lock(&self);
     fn unlock(&self);
 }
 
+#[derive(Debug)]
 pub struct SpinMutex {
     locked: AtomicBool,
 }
 
+#[derive(Debug)]
 pub struct BlockMutex {
     locked: AtomicBool,
     wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,

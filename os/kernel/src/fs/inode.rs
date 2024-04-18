@@ -19,6 +19,7 @@ static ROOT_INODE: Lazy<Arc<Inode>> = Lazy::new(|| {
 });
 
 /// 表示进程打开的文件或目录
+#[derive(Debug)]
 pub struct OSInode {
     readable: bool,
     writable: bool,
@@ -72,6 +73,7 @@ pub fn unlink_at(path: &str) -> Option<()> {
     ROOT_INODE.unlink_at(path)
 }
 
+#[derive(Debug)]
 struct OSInodeInner {
     /// **文件**内的偏移量
     offset: usize,

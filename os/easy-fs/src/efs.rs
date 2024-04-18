@@ -17,6 +17,7 @@ use crate::{BLOCK_BITS, BLOCK_SIZE};
 const INODE_SIZE: usize = mem::size_of::<DiskInode>();
 const INODES_PER_BLOCK: usize = BLOCK_SIZE / INODE_SIZE;
 
+#[derive(Debug)]
 pub struct EasyFileSystem {
     block_device: Arc<dyn BlockDevice>,
     inode_bitmap: Bitmap,

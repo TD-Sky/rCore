@@ -41,20 +41,24 @@ pub fn new(count: u64, flags: BitFlags<EventFdFlag>) -> Arc<dyn File + Send + Sy
     }
 }
 
+#[derive(Debug)]
 struct EventFdContext {
     count: AtomicU64,
     wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
+#[derive(Debug)]
 struct NonBlockEventFdContext {
     count: AtomicU64,
 }
 
+#[derive(Debug)]
 struct SemEventFdContext {
     count: AtomicU64,
     wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }
 
+#[derive(Debug)]
 struct SemNonBlockEventFdContext {
     count: AtomicU64,
 }

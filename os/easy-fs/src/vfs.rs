@@ -15,6 +15,7 @@ use crate::layout::DirEntry;
 use crate::layout::{DiskInode, DiskInodeKind};
 use crate::EasyFileSystem;
 
+#[derive(Debug)]
 pub struct Inode {
     /// inode所在块
     block_id: usize,

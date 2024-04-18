@@ -6,6 +6,7 @@ use riscv::register::sstatus;
 
 static INTERRUPT_GUARD: SafeCell<InterruptGuard> = SafeCell::new(InterruptGuard::new());
 
+#[derive(Debug)]
 pub struct UpCell<T> {
     inner: RefCell<T>,
 }

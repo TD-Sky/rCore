@@ -14,6 +14,15 @@ pub struct VirtIOBlock {
     condvars: BTreeMap<u16, Condvar>,
 }
 
+impl core::fmt::Debug for VirtIOBlock {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VirtIOBlock")
+            .field("base", &"Virtio HAL")
+            .field("condvars", &self.condvars)
+            .finish()
+    }
+}
+
 // VirtIO 设备需要占用部分内存作为一个公共区域从而更好的和 CPU 进行合作。
 // 在 VirtIO 架构下，需要在公共区域中放置一种叫做 `VirtQueue` 的环形队列，
 // CPU 可以向此环形队列中向 VirtIO 设备提交请求，也可以从队列中取得请求的结果。

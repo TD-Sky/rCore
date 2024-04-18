@@ -9,6 +9,7 @@ use crate::task::RecycleAllocator;
 
 static KSTACK_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 
+#[derive(Debug)]
 pub struct KernelStack(usize);
 
 /// 分配任务的内核栈

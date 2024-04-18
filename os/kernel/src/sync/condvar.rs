@@ -10,6 +10,7 @@ use crate::task::TaskControlBlock;
 use super::Mutex;
 use super::UpCell;
 
+#[derive(Debug)]
 pub struct Condvar {
     wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,
 }

@@ -20,12 +20,14 @@ pub mod stdio;
 
 pub use self::{inode::*, pipe::*};
 
+use core::fmt::Debug;
+
 use easy_fs::Stat;
 
 use crate::memory::UserBuffer;
 
 /// 内存与存储设备之间的数据交换通道
-pub trait File: Send + Sync {
+pub trait File: Debug + Send + Sync {
     fn readable(&self) -> bool;
     fn writable(&self) -> bool;
     fn read(&self, buf: UserBuffer) -> usize;

@@ -12,6 +12,7 @@ use super::frame_allocator::Frame;
 use enumflags2::bitflags;
 use enumflags2::BitFlags;
 
+#[derive(Debug)]
 pub struct PageTable {
     /// 一级页表的物理地址，要交给satp
     root: PhysPageNum,

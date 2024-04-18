@@ -6,9 +6,11 @@ use crate::sbi::console_getchar;
 use crate::task;
 
 /// 标准输入
+#[derive(Debug)]
 pub struct Stdin;
 
 /// 标准输出
+#[derive(Debug)]
 pub struct Stdout;
 
 impl File for Stdin {
