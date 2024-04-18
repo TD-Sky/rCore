@@ -11,7 +11,7 @@ enumflags2 = "0.7"                                     # kernel, easy-fs, fat
 log = "0.4"                                            # kernel, easy-fs
 riscv = "0.11"                                         # kernel
 sbi-rt = { version = "0.0.3" }                         # kernel
-spin = { version = "0.9", default-features = false }   # kernel, easy-fs
+spin = { version = "0.9", default-features = false }   # kernel, easy-fs, fat
 tinybmp = "0.5"                                        # kernel
 embedded-graphics = "0.8"                              # kernel
 goblin = { version = "0.8", default-features = false } # kernel

@@ -173,7 +173,7 @@ impl Bpb {
     /// 计算FAT占用扇区数并设置
     fn set_fat_size(&mut self, disk_size: usize) {
         let tmp1 = disk_size - (self.rsvd_sec_cnt.get() + self.root_dir_sectors()) as usize;
-        let mut tmp2 = 256 * self.sec_per_clus as u8 as usize + self.num_fats as usize;
+        let mut tmp2 = 256 * self.sec_per_clus as usize + self.num_fats as usize;
 
         if self.fil_sys_type.starts_with(b"FAT32") {
             tmp2 /= 2;

@@ -8,8 +8,10 @@
 
 #![no_std]
 
+use core::fmt::Debug;
+
 /// 块设备驱动特质
-pub trait BlockDevice: Send + Sync {
+pub trait BlockDevice: Debug + Send + Sync {
     fn read_block(&self, block_id: usize, buf: &mut [u8]);
     fn write_block(&self, block_id: usize, buf: &[u8]);
     fn handle_irq(&self);
