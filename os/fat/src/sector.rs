@@ -1,16 +1,16 @@
 //! 扇区的抽象
 
-use core::mem;
-
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::mem;
+
 use block_dev::BlockDevice;
 use spin::Mutex;
 use spin::Once;
 
-use crate::volume::reversed::SectorBytes;
+use crate::volume::reserved::SectorBytes;
 
 static CACHE_MANAGER: Once<CacheManager> = Once::new();
 
@@ -30,13 +30,19 @@ struct CacheManager {
     queue: Mutex<Vec<(usize, Arc<Mutex<Sector>>)>>,
 }
 
+#[inline]
 fn manager() -> &'static CacheManager {
     unsafe { CACHE_MANAGER.get_unchecked() }
 }
 
+#[inline]
+pub fn get(block_id: usize) -> Arc<Mutex<Sector>> {
+    manager().get(block_id)
+}
+
 /// 内存中的扇区
 #[derive(Debug)]
-struct Sector {
+pub struct Sector {
     /// 缓存的数据
     data: Box<[u8]>,
     /// 对应的块ID
@@ -109,7 +115,7 @@ impl CacheManager {
     const CAPACITY: usize = 16;
 
     // 块缓存调度策略：踢走闲置块
-    fn get(&self, block_id: usize, block_device: Arc<dyn BlockDevice>) -> Arc<Mutex<Sector>> {
+    fn get(&self, block_id: usize) -> Arc<Mutex<Sector>> {
         let mut queue = self.queue.lock();
 
         // 尝试从缓冲区中读取块

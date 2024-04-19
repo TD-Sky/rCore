@@ -17,7 +17,7 @@ pub struct Bpb {
     /// 一个簇的扇区数
     sec_per_clus: ClusterSectors,
 
-    /// TODO: 对齐用
+    /// 保留区的扇区数
     rsvd_sec_cnt: NonZeroU16,
 
     /// 此卷的文件分配表(FAT)数量，建议为2
@@ -139,11 +139,11 @@ pub enum FatType {
 }
 
 #[derive(Debug)]
-pub struct DiskSz2SecPerClus<const N: usize> {
-    base: [(usize, ClusterSectors); N],
+pub struct DiskSz2SecPerClus {
+    base: [(usize, ClusterSectors); 6],
 }
 
-impl<const N: usize> DiskSz2SecPerClus<N> {
+impl DiskSz2SecPerClus {
     pub fn get(&self, disk_size: usize) -> ClusterSectors {
         self.base
             .iter()
@@ -154,7 +154,7 @@ impl<const N: usize> DiskSz2SecPerClus<N> {
 }
 
 #[rustfmt::skip]
-static DiskSz2SecPerClusFat32: DiskSz2SecPerClus<6> = DiskSz2SecPerClus {
+static DS2SPC: DiskSz2SecPerClus = DiskSz2SecPerClus {
     base: [
         (66600,      ClusterSectors::S0),   // <= 32.5 MiB => 0 value for SecPerClusVal trips an error
         (532480,     ClusterSectors::S1),   // <= 260  MiB => 0.5k cluster
@@ -164,6 +164,16 @@ static DiskSz2SecPerClusFat32: DiskSz2SecPerClus<6> = DiskSz2SecPerClus {
         (usize::MAX, ClusterSectors::S64),  // >  32   GB  => 32k  cluster
     ],
 };
+
+impl Bpb {
+    pub const fn fat_area_sector(&self) -> usize {
+        self.rsvd_sec_cnt.get() as usize
+    }
+
+    pub const fn data_area_sector(&self) -> usize {
+        self.fat_area_sector() + self.num_fats as usize * self.fat_size()
+    }
+}
 
 impl Bpb {
     const fn root_dir_sectors(&self) -> u16 {

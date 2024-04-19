@@ -1,6 +1,7 @@
 use enumflags2::{bitflags, BitFlags};
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct DirEntry {
     name: [u8; 11],
 
