@@ -171,33 +171,20 @@ impl Bpb {
     }
 
     pub const fn data_area_sector(&self) -> usize {
-        self.fat_area_sector() + self.num_fats as usize * self.fat_size()
+        self.fat_area_sector() + self.num_fats as usize * self.fat_size() + self.root_dir_sectors()
     }
 }
 
 impl Bpb {
-    const fn root_dir_sectors(&self) -> u16 {
-        (self._root_ent_cnt * 32 + (self.byts_per_sec as u16 - 1)) / self.byts_per_sec as u16
+    /// 计算根目录占用的扇区数
+    ///
+    /// - FAT32: 0
+    const fn root_dir_sectors(&self) -> usize {
+        ((self._root_ent_cnt * 32 + (self.byts_per_sec as u16 - 1)) / self.byts_per_sec as u16)
+            as usize
     }
 
-    /// 计算FAT占用扇区数并设置
-    fn set_fat_size(&mut self, disk_size: usize) {
-        let tmp1 = disk_size - (self.rsvd_sec_cnt.get() + self.root_dir_sectors()) as usize;
-        let mut tmp2 = 256 * self.sec_per_clus as usize + self.num_fats as usize;
-
-        if self.fil_sys_type.starts_with(b"FAT32") {
-            tmp2 /= 2;
-        }
-        let fat_size = (tmp1 + tmp2 - 1) / tmp2;
-
-        if self.fil_sys_type.starts_with(b"FAT32") {
-            self._fat_sz16 = 0;
-            self.fat_sz32 = (fat_size as u32).try_into().unwrap();
-        } else {
-            self._fat_sz16 = fat_size as u16;
-        }
-    }
-
+    /// FAT占用的扇区数
     const fn fat_size(&self) -> usize {
         if self._fat_sz16 > 0 {
             self._fat_sz16 as usize
@@ -214,13 +201,8 @@ impl Bpb {
         }
     }
 
-    /// Required: the FAT size is known
     const fn fat_type(&self) -> FatType {
-        let data_sec = self.total_sectors()
-            - (self.rsvd_sec_cnt.get() as usize
-                + self.num_fats as usize * self.fat_size()
-                + self.root_dir_sectors() as usize);
-        let clusters = data_sec / self.sec_per_clus as u8 as usize;
+        let clusters = self.total_clusters();
 
         if clusters <= 4084 {
             FatType::T12
@@ -228,6 +210,28 @@ impl Bpb {
             FatType::T16
         } else {
             FatType::T32
+        }
+    }
+
+    const fn total_clusters(&self) -> usize {
+        (self.total_sectors() - self.data_area_sector()) / self.sec_per_clus as usize
+    }
+
+    /// 计算FAT占用扇区数并设置
+    fn set_fat_size(&mut self, disk_size: usize) {
+        let tmp1 = disk_size - (self.rsvd_sec_cnt.get() as usize + self.root_dir_sectors());
+        let mut tmp2 = 256 * self.sec_per_clus as usize + self.num_fats as usize;
+
+        if self.fil_sys_type.starts_with(b"FAT32") {
+            tmp2 /= 2;
+        }
+        let fat_size = (tmp1 + tmp2 - 1) / tmp2;
+
+        if self.fil_sys_type.starts_with(b"FAT32") {
+            self._fat_sz16 = 0;
+            self.fat_sz32 = (fat_size as u32).try_into().unwrap();
+        } else {
+            self._fat_sz16 = fat_size as u16;
         }
     }
 }

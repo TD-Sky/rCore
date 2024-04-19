@@ -1,13 +1,13 @@
 use std::mem;
 
-use fat::volume::{data::DirEntry, reserved::Bpb};
+use fat::volume::{
+    data::DirEntry,
+    reserved::{Bpb, FsInfo},
+};
 
 #[test]
-fn bpb() {
+fn volume() {
     assert_eq!(512, mem::size_of::<Bpb>());
-}
-
-#[test]
-fn dir_entry() {
+    assert_eq!(512, mem::size_of::<FsInfo>());
     assert_eq!(32, mem::size_of::<DirEntry>());
 }
