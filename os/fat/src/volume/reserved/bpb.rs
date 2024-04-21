@@ -12,7 +12,7 @@ pub struct Bpb {
     bs_oem_name: [u8; 8],
 
     /// 一个扇区的字节量
-    byts_per_sec: SectorBytes,
+    pub(crate) byts_per_sec: SectorBytes,
 
     /// 一个簇的扇区数
     sec_per_clus: ClusterSectors,

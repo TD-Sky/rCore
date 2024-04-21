@@ -1,8 +1,9 @@
-use core::mem;
 use alloc::sync::Arc;
+use core::mem;
 
 use block_dev::BlockDevice;
 
+use crate::sector;
 use crate::volume::reserved::Bpb;
 
 #[derive(Debug)]
@@ -20,6 +21,8 @@ impl FatFileSystem {
             dev.read_block(0, &mut buf);
             unsafe { mem::transmute(buf) }
         };
+
+        sector::init_cache(bpb.byts_per_sec, dev);
 
         FatFileSystem {
             fat_area: bpb.fat_area_sector(),
