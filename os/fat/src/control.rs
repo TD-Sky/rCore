@@ -3,15 +3,15 @@ use core::mem;
 
 use block_dev::BlockDevice;
 
-use crate::sector;
+use crate::sector::{self, SectorId};
 use crate::volume::reserved::Bpb;
 
 #[derive(Debug)]
 pub struct FatFileSystem {
     /// FAT区的起始扇区
-    fat_area: usize,
+    fat_area: SectorId,
     /// 数据区的起始扇区
-    data_area: usize,
+    data_area: SectorId,
 }
 
 impl FatFileSystem {

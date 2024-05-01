@@ -1,5 +1,7 @@
 use core::num::{NonZeroU16, NonZeroU32};
 
+use crate::sector::SectorId;
+
 /// BIOS Parameter Block BIOS参数块
 /// 位于保留区的第一扇区，该扇区又名启动扇区。
 #[derive(Debug)]
@@ -166,11 +168,11 @@ static DS2SPC: DiskSz2SecPerClus = DiskSz2SecPerClus {
 };
 
 impl Bpb {
-    pub const fn fat_area_sector(&self) -> usize {
-        self.rsvd_sec_cnt.get() as usize
+    pub const fn fat_area_sector(&self) -> SectorId {
+        SectorId::new(self.rsvd_sec_cnt.get() as usize)
     }
 
-    pub const fn data_area_sector(&self) -> usize {
+    pub fn data_area_sector(&self) -> SectorId {
         self.fat_area_sector() + self.num_fats as usize * self.fat_size() + self.root_dir_sectors()
     }
 }
@@ -201,7 +203,7 @@ impl Bpb {
         }
     }
 
-    const fn fat_type(&self) -> FatType {
+    fn fat_type(&self) -> FatType {
         let clusters = self.total_clusters();
 
         if clusters <= 4084 {
@@ -213,8 +215,8 @@ impl Bpb {
         }
     }
 
-    const fn total_clusters(&self) -> usize {
-        (self.total_sectors() - self.data_area_sector()) / self.sec_per_clus as usize
+    fn total_clusters(&self) -> usize {
+        (self.total_sectors() - usize::from(self.data_area_sector())) / self.sec_per_clus as usize
     }
 
     /// 计算FAT占用扇区数并设置

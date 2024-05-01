@@ -7,10 +7,13 @@ use alloc::vec::Vec;
 use core::mem;
 
 use block_dev::BlockDevice;
+use derive_more::{Add, From, Into};
 use spin::Mutex;
 use spin::Once;
 
 use crate::volume::reserved::SectorBytes;
+
+const BLOCK_SIZE: usize = 512;
 
 static CACHE_MANAGER: Once<CacheManager> = Once::new();
 
@@ -27,7 +30,7 @@ struct CacheManager {
     size: usize,
     /// 底层块设备的引用
     dev: Arc<dyn BlockDevice>,
-    queue: Mutex<Vec<(usize, Arc<Mutex<Sector>>)>>,
+    queue: Mutex<Vec<(SectorId, Arc<Mutex<Sector>>)>>,
 }
 
 #[inline]
@@ -36,8 +39,8 @@ fn manager() -> &'static CacheManager {
 }
 
 #[inline]
-pub fn get(block_id: usize) -> Arc<Mutex<Sector>> {
-    manager().get(block_id)
+pub fn get(id: SectorId) -> Arc<Mutex<Sector>> {
+    manager().get(id)
 }
 
 /// 内存中的扇区
@@ -46,20 +49,42 @@ pub struct Sector {
     /// 缓存的数据
     data: Box<[u8]>,
     /// 对应的块ID
-    block_id: usize,
+    id: SectorId,
     /// 是否为脏块
     modified: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Add, From, Into)]
+#[repr(transparent)]
+pub struct SectorId(usize);
+
+impl core::ops::Add<usize> for SectorId {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        self + Self(rhs)
+    }
+}
+
+impl SectorId {
+    pub const fn new(raw: usize) -> Self {
+        Self(raw)
+    }
+
+    pub fn block(self) -> usize {
+        self.0 * (manager().size / BLOCK_SIZE)
+    }
+}
+
 impl Sector {
-    pub fn new(block_id: usize) -> Self {
+    pub fn new(id: SectorId) -> Self {
         let mgr = manager();
         let mut data = vec![0; mgr.size];
-        mgr.dev.read_block(block_id, &mut data);
+        mgr.dev.read_block(id.block(), &mut data);
 
         Self {
             data: data.into(),
-            block_id,
+            id,
             modified: false,
         }
     }
@@ -67,7 +92,7 @@ impl Sector {
     pub fn sync(&mut self) {
         if self.modified {
             self.modified = false;
-            manager().dev.write_block(self.block_id, &self.data);
+            manager().dev.write_block(self.id.block(), &self.data);
         }
     }
 
@@ -115,13 +140,13 @@ impl CacheManager {
     const CAPACITY: usize = 16;
 
     // 块缓存调度策略：踢走闲置块
-    fn get(&self, block_id: usize) -> Arc<Mutex<Sector>> {
+    fn get(&self, id: SectorId) -> Arc<Mutex<Sector>> {
         let mut queue = self.queue.lock();
 
         // 尝试从缓冲区中读取块
         if let Some(cache) = queue
             .iter()
-            .find_map(|(id, cache)| (block_id == *id).then_some(cache))
+            .find_map(|(sid, cache)| (id == *sid).then_some(cache))
         {
             return Arc::clone(cache);
         };
@@ -136,8 +161,8 @@ impl CacheManager {
         }
 
         // 缓存新块
-        let block_cache = Arc::new(Mutex::new(Sector::new(block_id)));
-        queue.push((block_id, block_cache.clone()));
+        let block_cache = Arc::new(Mutex::new(Sector::new(id)));
+        queue.push((id, block_cache.clone()));
 
         block_cache
     }
