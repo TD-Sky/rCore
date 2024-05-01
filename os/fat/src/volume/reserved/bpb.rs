@@ -185,12 +185,27 @@ impl Bpb {
         SectorId::new(self.rsvd_sec_cnt.get() as usize)
     }
 
+    pub const fn fat_count(&self) -> usize {
+        self.num_fats as usize
+    }
+
     pub fn data_area_sector(&self) -> SectorId {
-        self.fat_area_sector() + self.num_fats as usize * self.fat_size() + self.root_dir_sectors()
+        self.fat_area_sector()
+            + self.num_fats as usize * self.fat_sectors()
+            + self.root_dir_sectors()
     }
 
     pub const fn sector_bytes(&self) -> usize {
         self.byts_per_sec as usize
+    }
+
+    /// FAT占用的扇区数
+    pub const fn fat_sectors(&self) -> usize {
+        if self._fat_sz16 > 0 {
+            self._fat_sz16 as usize
+        } else {
+            self.fat_sz32.get() as usize
+        }
     }
 }
 
@@ -201,15 +216,6 @@ impl Bpb {
     const fn root_dir_sectors(&self) -> usize {
         ((self._root_ent_cnt * 32 + (self.byts_per_sec as u16 - 1)) / self.byts_per_sec as u16)
             as usize
-    }
-
-    /// FAT占用的扇区数
-    const fn fat_size(&self) -> usize {
-        if self._fat_sz16 > 0 {
-            self._fat_sz16 as usize
-        } else {
-            self.fat_sz32.get() as usize
-        }
     }
 
     const fn total_sectors(&self) -> usize {

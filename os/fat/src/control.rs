@@ -4,12 +4,13 @@ use core::mem;
 use block_dev::BlockDevice;
 
 use crate::sector::{self, SectorId};
+use crate::volume::fat::FatArea;
 use crate::volume::reserved::{init_bpb, Bpb};
 
 #[derive(Debug)]
 pub struct FatFileSystem {
     /// FAT区的起始扇区
-    fat_area: SectorId,
+    fat_area: FatArea,
     /// 数据区的起始扇区
     data_area: SectorId,
 }
@@ -25,7 +26,7 @@ impl FatFileSystem {
         sector::init_cache(dev);
 
         let fs = FatFileSystem {
-            fat_area: bpb.fat_area_sector(),
+            fat_area: FatArea::new(&bpb),
             data_area: bpb.data_area_sector(),
         };
         init_bpb(bpb);

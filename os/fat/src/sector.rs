@@ -52,7 +52,7 @@ pub struct Sector {
     modified: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Add, From, Into)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Add, From, Into)]
 #[repr(transparent)]
 pub struct SectorId(usize);
 
