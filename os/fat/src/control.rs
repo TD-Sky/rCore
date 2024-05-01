@@ -4,7 +4,7 @@ use core::mem;
 use block_dev::BlockDevice;
 
 use crate::sector::{self, SectorId};
-use crate::volume::reserved::Bpb;
+use crate::volume::reserved::{init_bpb, Bpb};
 
 #[derive(Debug)]
 pub struct FatFileSystem {
@@ -22,11 +22,13 @@ impl FatFileSystem {
             unsafe { mem::transmute(buf) }
         };
 
-        sector::init_cache(bpb.byts_per_sec, dev);
+        sector::init_cache(dev);
 
-        FatFileSystem {
+        let fs = FatFileSystem {
             fat_area: bpb.fat_area_sector(),
             data_area: bpb.data_area_sector(),
-        }
+        };
+        init_bpb(bpb);
+        fs
     }
 }

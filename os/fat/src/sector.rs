@@ -11,15 +11,14 @@ use derive_more::{Add, From, Into};
 use spin::Mutex;
 use spin::Once;
 
-use crate::volume::reserved::SectorBytes;
+use crate::volume::reserved::bpb;
 
 const BLOCK_SIZE: usize = 512;
 
 static CACHE_MANAGER: Once<CacheManager> = Once::new();
 
-pub fn init_cache(size: SectorBytes, dev: &Arc<dyn BlockDevice>) {
+pub fn init_cache(dev: &Arc<dyn BlockDevice>) {
     CACHE_MANAGER.call_once(|| CacheManager {
-        size: size as usize,
         dev: dev.clone(),
         queue: Mutex::default(),
     });
@@ -27,7 +26,6 @@ pub fn init_cache(size: SectorBytes, dev: &Arc<dyn BlockDevice>) {
 
 #[derive(Debug)]
 struct CacheManager {
-    size: usize,
     /// 底层块设备的引用
     dev: Arc<dyn BlockDevice>,
     queue: Mutex<Vec<(SectorId, Arc<Mutex<Sector>>)>>,
@@ -72,14 +70,14 @@ impl SectorId {
     }
 
     pub fn block(self) -> usize {
-        self.0 * (manager().size / BLOCK_SIZE)
+        self.0 * (bpb().sector_bytes() / BLOCK_SIZE)
     }
 }
 
 impl Sector {
     pub fn new(id: SectorId) -> Self {
         let mgr = manager();
-        let mut data = vec![0; mgr.size];
+        let mut data = vec![0; bpb().sector_bytes()];
         mgr.dev.read_block(id.block(), &mut data);
 
         Self {

@@ -1,6 +1,19 @@
 use core::num::{NonZeroU16, NonZeroU32};
 
-use crate::sector::SectorId;
+use spin::once::Once;
+
+use crate::SectorId;
+
+static BPB: Once<Bpb> = Once::new();
+
+pub fn init_bpb(bpb: Bpb) {
+    BPB.call_once(|| bpb);
+}
+
+#[inline]
+pub fn bpb() -> &'static Bpb {
+    unsafe { BPB.get_unchecked() }
+}
 
 /// BIOS Parameter Block BIOS参数块
 /// 位于保留区的第一扇区，该扇区又名启动扇区。
@@ -14,7 +27,7 @@ pub struct Bpb {
     bs_oem_name: [u8; 8],
 
     /// 一个扇区的字节量
-    pub(crate) byts_per_sec: SectorBytes,
+    byts_per_sec: SectorBytes,
 
     /// 一个簇的扇区数
     sec_per_clus: ClusterSectors,
@@ -174,6 +187,10 @@ impl Bpb {
 
     pub fn data_area_sector(&self) -> SectorId {
         self.fat_area_sector() + self.num_fats as usize * self.fat_size() + self.root_dir_sectors()
+    }
+
+    pub const fn sector_bytes(&self) -> usize {
+        self.byts_per_sec as usize
     }
 }
 
