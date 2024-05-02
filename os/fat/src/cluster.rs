@@ -28,6 +28,12 @@ impl From<ClusterId<u32>> for usize {
     }
 }
 
+impl From<usize> for ClusterId<u32> {
+    fn from(raw: usize) -> Self {
+        Self::from(raw as u32)
+    }
+}
+
 impl ClusterId<u32> {
     pub const FREE: Self = Self(0);
 
