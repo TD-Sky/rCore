@@ -4,7 +4,9 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::iter::Step;
 use core::mem;
+use core::slice;
 
 use block_dev::BlockDevice;
 use derive_more::{Add, From, Into};
@@ -64,6 +66,20 @@ impl core::ops::Add<usize> for SectorId {
     }
 }
 
+impl Step for SectorId {
+    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+        usize::steps_between(&start.0, &end.0)
+    }
+
+    fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        usize::forward_checked(start.0, count).map(Self)
+    }
+
+    fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        usize::backward_checked(start.0, count).map(Self)
+    }
+}
+
 impl SectorId {
     pub const fn new(raw: usize) -> Self {
         Self(raw)
@@ -94,14 +110,14 @@ impl Sector {
         }
     }
 
-    pub fn get<T: Sized>(&self, offset: usize) -> &T {
+    pub fn get<T>(&self, offset: usize) -> &T {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= self.data.len());
         let addr = self.offset(offset).cast();
         unsafe { &*addr }
     }
 
-    pub fn get_mut<T: Sized>(&mut self, offset: usize) -> &mut T {
+    pub fn get_mut<T>(&mut self, offset: usize) -> &mut T {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= self.data.len());
         self.modified = true;
@@ -109,14 +125,26 @@ impl Sector {
         unsafe { &mut *addr }
     }
 
+    pub fn as_slice<T>(&self) -> &[T] {
+        let type_size = mem::size_of::<T>();
+        let len = self.data.len() / type_size;
+        assert_eq!(0, self.data.len() % type_size);
+        unsafe { slice::from_raw_parts(self.data.as_ptr().cast::<T>(), len) }
+    }
+
     #[inline]
-    pub fn map<T: Sized, V>(&self, offset: usize, f: impl FnOnce(&T) -> V) -> V {
+    pub fn map<T, V>(&self, offset: usize, f: impl FnOnce(&T) -> V) -> V {
         f(self.get(offset))
     }
 
     #[inline]
-    pub fn map_mut<T: Sized, V>(&mut self, offset: usize, f: impl FnOnce(&mut T) -> V) -> V {
+    pub fn map_mut<T, V>(&mut self, offset: usize, f: impl FnOnce(&mut T) -> V) -> V {
         f(self.get_mut(offset))
+    }
+
+    #[inline]
+    pub fn map_slice<T, V>(&self, f: impl FnOnce(&[T]) -> V) -> V {
+        f(self.as_slice())
     }
 }
 

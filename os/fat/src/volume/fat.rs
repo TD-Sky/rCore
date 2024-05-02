@@ -1,12 +1,9 @@
-use alloc::boxed::Box;
 use core::mem;
 use core::ops::Range;
 
 use super::reserved::{bpb, Bpb};
 use crate::{sector, SectorId};
 use crate::{ClusterError, ClusterId};
-
-pub type Fat32 = Box<[ClusterId<u32>]>;
 
 #[derive(Debug)]
 pub struct FatArea {
@@ -53,6 +50,38 @@ impl FatArea {
     //
     //     Ok(clusters.into_iter())
     // }
+
+    pub fn alloc(&self) -> Option<ClusterId<u32>> {
+        let mut range = self.range.clone();
+
+        if let Some(cidx) =
+            sector::get(range.next()?)
+                .lock()
+                .map_slice(|clusters: &[ClusterId<u32>]| {
+                    clusters
+                        .iter()
+                        .skip(ClusterId::MIN.into())
+                        .position(|&cid| cid == ClusterId::FREE)
+                        .map(|cidx| cidx + 2)
+                })
+        {
+            return Some((cidx as u32).into());
+        }
+
+        for (i, sid) in range.enumerate() {
+            if let Some(cidx) =
+                sector::get(sid)
+                    .lock()
+                    .map_slice(|clusters: &[ClusterId<u32>]| {
+                        clusters.iter().position(|&cid| cid == ClusterId::FREE)
+                    })
+            {
+                return Some(Self::pos2cluster_id(i + 1, cidx));
+            }
+        }
+
+        None
+    }
 
     /// 移除整个簇链
     pub fn remove(&self, id: ClusterId<u32>) -> Result<(), ClusterError> {
@@ -104,5 +133,9 @@ impl FatArea {
             self.get_sector(id),
             u32::from(id) as usize % Self::sector_clusters(),
         )
+    }
+
+    const fn pos2cluster_id(sector_index: usize, cluster_index: usize) -> ClusterId<u32> {
+        ClusterId::new((sector_index * cluster_index) as u32)
     }
 }

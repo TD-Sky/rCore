@@ -22,6 +22,12 @@ impl From<ClusterId<u32>> for u32 {
     }
 }
 
+impl From<ClusterId<u32>> for usize {
+    fn from(id: ClusterId<u32>) -> Self {
+        id.0 as usize
+    }
+}
+
 impl ClusterId<u32> {
     pub const FREE: Self = Self(0);
 
@@ -31,6 +37,10 @@ impl ClusterId<u32> {
     pub const EOF: Self = Self(u32::MAX);
 
     pub const BAD: Self = Self(0x0FFF_FFF7);
+
+    pub const fn new(raw: u32) -> Self {
+        Self(raw & 0x0FFF_FFFF)
+    }
 
     /// NOTE: 没有FAT提供的真实最大可用簇编号，无法得知全部保留簇
     pub fn is_unavailable(&self) -> bool {
