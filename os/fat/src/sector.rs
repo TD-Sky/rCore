@@ -113,23 +113,31 @@ impl Sector {
     pub fn get<T>(&self, offset: usize) -> &T {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= self.data.len());
-        let addr = self.offset(offset).cast();
-        unsafe { &*addr }
+        let addr = &self.data[offset];
+        unsafe { mem::transmute(addr) }
     }
 
     pub fn get_mut<T>(&mut self, offset: usize) -> &mut T {
         let type_size = mem::size_of::<T>();
         assert!(type_size + offset <= self.data.len());
         self.modified = true;
-        let addr = self.offset(offset).cast_mut().cast();
-        unsafe { &mut *addr }
+        let addr = &mut self.data[offset];
+        unsafe { mem::transmute(addr) }
     }
 
     pub fn as_slice<T>(&self) -> &[T] {
         let type_size = mem::size_of::<T>();
         let len = self.data.len() / type_size;
         assert_eq!(0, self.data.len() % type_size);
-        unsafe { slice::from_raw_parts(self.data.as_ptr().cast::<T>(), len) }
+        unsafe { slice::from_raw_parts(self.data.as_ptr().cast(), len) }
+    }
+
+    pub fn as_mut_slice<T>(&mut self) -> &mut [T] {
+        let type_size = mem::size_of::<T>();
+        let len = self.data.len() / type_size;
+        assert_eq!(0, self.data.len() % type_size);
+        self.modified = true;
+        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), len) }
     }
 
     #[inline]
@@ -146,12 +154,16 @@ impl Sector {
     pub fn map_slice<T, V>(&self, f: impl FnOnce(&[T]) -> V) -> V {
         f(self.as_slice())
     }
-}
 
-impl Sector {
     #[inline]
-    fn offset(&self, count: usize) -> *const u8 {
-        &self.data[count]
+    pub fn map_mut_slice<T, V>(&mut self, f: impl FnOnce(&mut [T]) -> V) -> V {
+        f(self.as_mut_slice())
+    }
+
+    #[inline]
+    pub fn zeroize(&mut self) {
+        self.data.fill(0);
+        self.modified = true;
     }
 }
 

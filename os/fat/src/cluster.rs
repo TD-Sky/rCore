@@ -1,3 +1,5 @@
+use core::ops::Sub;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct ClusterId<T = u32>(T);
@@ -8,6 +10,14 @@ pub enum ClusterError {
     Defective,
     Reserved,
     Eof,
+}
+
+impl Sub for ClusterId<u32> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
 }
 
 impl From<u32> for ClusterId<u32> {
@@ -31,6 +41,13 @@ impl From<ClusterId<u32>> for usize {
 impl From<usize> for ClusterId<u32> {
     fn from(raw: usize) -> Self {
         Self::from(raw as u32)
+    }
+}
+
+impl From<(u16, u16)> for ClusterId<u32> {
+    fn from((low, high): (u16, u16)) -> Self {
+        let high: u32 = (high as u32) << 16;
+        Self(high + low as u32)
     }
 }
 
@@ -61,5 +78,16 @@ impl ClusterId<u32> {
             id if id.is_unavailable() => Err(ClusterError::Reserved),
             id => Ok(id),
         }
+    }
+
+    pub fn abs_diff(&self, other: Self) -> usize {
+        self.0.abs_diff(other.0) as usize
+    }
+
+    /// Splits into `(low, high)`
+    pub fn split(self) -> (u16, u16) {
+        let low = self.0 & 0xFFFF;
+        let high = self.0 >> 16;
+        (low as u16, high as u16)
     }
 }

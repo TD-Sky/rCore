@@ -1,7 +1,7 @@
 use core::mem;
 use core::ops::Range;
 
-use crate::volume::reserved::{bpb, Bpb};
+use crate::volume::reserved::{self, bpb, Bpb};
 use crate::{sector, SectorId};
 use crate::{ClusterError, ClusterId};
 
@@ -36,21 +36,26 @@ impl FatArea {
         }
     }
 
-    /// 寻找未分配的簇。
-    pub fn alloc(&self) -> Option<ClusterId<u32>> {
+    /// 寻找未分配的簇，并将其设为`EOF`
+    pub fn alloc(&mut self) -> Option<ClusterId<u32>> {
         let mut range = self.range.clone();
 
         if let Some(cidx) =
             sector::get(range.next()?)
                 .lock()
-                .map_slice(|clusters: &[ClusterId<u32>]| {
+                .map_mut_slice(|clusters: &mut [ClusterId<u32>]| {
                     clusters
-                        .iter()
+                        .iter_mut()
+                        .enumerate()
                         .skip(ClusterId::MIN.into())
-                        .position(|&cid| cid == ClusterId::FREE)
-                        .map(|cidx| cidx + 2)
+                        .find(|(_, cid)| **cid == ClusterId::FREE)
+                        .map(|(cidx, cid)| {
+                            *cid = ClusterId::EOF;
+                            cidx
+                        })
                 })
         {
+            reserved::record_alloc();
             return Some((cidx as u32).into());
         }
 
@@ -58,10 +63,18 @@ impl FatArea {
             if let Some(cidx) =
                 sector::get(sid)
                     .lock()
-                    .map_slice(|clusters: &[ClusterId<u32>]| {
-                        clusters.iter().position(|&cid| cid == ClusterId::FREE)
+                    .map_mut_slice(|clusters: &mut [ClusterId<u32>]| {
+                        clusters
+                            .iter_mut()
+                            .enumerate()
+                            .find(|(_, cid)| **cid == ClusterId::FREE)
+                            .map(|(cidx, cid)| {
+                                *cid = ClusterId::EOF;
+                                cidx
+                            })
                     })
             {
+                reserved::record_alloc();
                 return Some(Self::pos2cluster_id(i + 1, cidx));
             }
         }
@@ -70,7 +83,7 @@ impl FatArea {
     }
 
     /// 移除整个簇链表。
-    pub fn remove(&self, id: ClusterId<u32>) -> Result<(), ClusterError> {
+    pub fn remove(&mut self, id: ClusterId<u32>) -> Result<(), ClusterError> {
         let mut id = self.validate_id(id)?;
 
         loop {
@@ -83,6 +96,7 @@ impl FatArea {
                     id == ClusterId::EOF
                 },
             );
+            reserved::record_free();
             if is_eof {
                 break;
             }

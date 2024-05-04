@@ -199,12 +199,24 @@ impl Bpb {
         self.byts_per_sec as usize
     }
 
+    pub const fn cluster_sectors(&self) -> usize {
+        self.sec_per_clus as usize
+    }
+
     /// FAT占用的扇区数
     pub const fn fat_sectors(&self) -> usize {
         if self._fat_sz16 > 0 {
             self._fat_sz16 as usize
         } else {
             self.fat_sz32.get() as usize
+        }
+    }
+
+    pub const fn total_sectors(&self) -> usize {
+        if self._tot_sec16 > 0 {
+            self._tot_sec16 as usize
+        } else {
+            self.tot_sec32.get() as usize
         }
     }
 }
@@ -216,14 +228,6 @@ impl Bpb {
     const fn root_dir_sectors(&self) -> usize {
         ((self._root_ent_cnt * 32 + (self.byts_per_sec as u16 - 1)) / self.byts_per_sec as u16)
             as usize
-    }
-
-    const fn total_sectors(&self) -> usize {
-        if self._tot_sec16 > 0 {
-            self._tot_sec16 as usize
-        } else {
-            self.tot_sec32.get() as usize
-        }
     }
 
     fn fat_type(&self) -> FatType {
