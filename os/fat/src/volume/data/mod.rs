@@ -2,7 +2,9 @@ mod dir_entry;
 
 use core::ops::Range;
 
-pub use self::dir_entry::{AttrFlag, DirEntry, LongDirEntry};
+pub use self::dir_entry::{
+    dir_entry_name, AttrFlag, DirEntry, DirEntryStatus, LongDirEntry, ShortDirEntry,
+};
 use crate::volume::reserved::{bpb, Bpb};
 use crate::{ClusterError, ClusterId, SectorId};
 

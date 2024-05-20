@@ -1,7 +1,7 @@
 use std::mem;
 
 use fat::volume::{
-    data::{DirEntry, LongDirEntry},
+    data::{ShortDirEntry, LongDirEntry},
     reserved::{Bpb, FsInfo},
 };
 
@@ -9,6 +9,6 @@ use fat::volume::{
 fn volume() {
     assert_eq!(512, mem::size_of::<Bpb>());
     assert_eq!(512, mem::size_of::<FsInfo>());
-    assert_eq!(32, mem::size_of::<DirEntry>());
+    assert_eq!(32, mem::size_of::<ShortDirEntry>());
     assert_eq!(32, mem::size_of::<LongDirEntry>())
 }

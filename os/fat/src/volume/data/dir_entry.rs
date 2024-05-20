@@ -2,15 +2,33 @@
 //!
 //! 因为FAT条目存放着下一个簇的编号，
 //! 其中`0`表示簇未分配，`1`保留，
-//! 所以数据区第一个可用的簇编号（Bpb.root_clus）一般为2
+//! 所以数据区第一个可用的簇编号（Bpb.root_clus）一般为2。
 
+use core::mem::ManuallyDrop;
+
+use alloc::{string::String, vec::Vec};
 use enumflags2::{bitflags, BitFlags};
 
 use crate::ClusterId;
 
-#[derive(Debug, Default)]
+/// 这是一个极度危险的类型，只应该在搜索目录项时使用
+pub union DirEntry {
+    pub short: ManuallyDrop<ShortDirEntry>,
+    pub long: ManuallyDrop<LongDirEntry>,
+}
+
+impl DirEntry {
+    /// # Safety
+    ///
+    /// 通过属性才能知晓目录项属于短还是长。
+    pub unsafe fn attr(&self) -> BitFlags<AttrFlag> {
+        self.short.attr()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 #[repr(packed)]
-pub struct DirEntry {
+pub struct ShortDirEntry {
     name: [u8; 11],
 
     attr: BitFlags<AttrFlag>,
@@ -50,19 +68,27 @@ pub struct DirEntry {
     file_size: u32,
 }
 
-impl DirEntry {
+impl ShortDirEntry {
     pub fn cluster_id(&self) -> ClusterId<u32> {
         (self.fst_clus_lo, self.fst_clus_hi).into()
     }
 
     pub fn checksum(&self) -> u8 {
-        self.name.iter().rev().fold(0, |sum, b| {
+        Self::checksum_from(self.name.as_slice())
+    }
+
+    pub fn checksum_from<'a>(bytes: impl IntoIterator<Item = &'a u8>) -> u8 {
+        let mut arr = [0; 8];
+        for (a, &b) in arr.iter_mut().zip(bytes) {
+            *a = b;
+        }
+        arr.iter().rev().fold(0, |sum, b| {
             (if sum & 1 != 0 { 0x80 } else { 0 }) + (sum >> 1) + *b
         })
     }
 
     pub fn new_directory(name: &str, id: ClusterId<u32>) -> Self {
-        let mut dir_entry = DirEntry::default();
+        let mut dir_entry = ShortDirEntry::default();
 
         dir_entry
             .name
@@ -78,12 +104,28 @@ impl DirEntry {
 
         dir_entry
     }
+
+    pub fn status(&self) -> DirEntryStatus {
+        match self.name[0] {
+            0xE5 => DirEntryStatus::Free,
+            0x00 => DirEntryStatus::FreeHead,
+            _ => DirEntryStatus::Occupied,
+        }
+    }
+
+    pub fn attr(&self) -> BitFlags<AttrFlag> {
+        self.attr
+    }
 }
 
-#[derive(Debug)]
+/// 可容纳名字的26个字节。
+///
+/// 目录项名称最长为255字节，所以最多用到10个长目录项。
+#[derive(Debug, Default, Clone)]
 #[repr(packed)]
 pub struct LongDirEntry {
-    ord: u8,
+    /// 序号（1起）
+    pub ord: u8,
     name1: [u8; 10],
     /// [`attr_long_name`]
     attr: BitFlags<AttrFlag>,
@@ -91,7 +133,7 @@ pub struct LongDirEntry {
     _type: u8,
     /// 此项跟随的短名称目录项的校验和。
     /// 若不一致则说明发生了错误
-    chksum: u8,
+    pub chksum: u8,
     name2: [u8; 12],
     /// 0
     _fst_clus_lo: u16,
@@ -99,7 +141,13 @@ pub struct LongDirEntry {
 }
 
 impl LongDirEntry {
-    const LAST_LONG_ENTRY: u8 = 0b0100_0000;
+    pub const LAST_MASK: u8 = 0b0100_0000;
+}
+
+impl LongDirEntry {
+    pub fn attr() -> BitFlags<AttrFlag> {
+        AttrFlag::ReadOnly | AttrFlag::Hidden | AttrFlag::System | AttrFlag::VolumeID
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,6 +165,33 @@ pub enum AttrFlag {
     Archive = 0b0010_0000,
 }
 
-pub fn attr_long_name() -> BitFlags<AttrFlag> {
-    AttrFlag::ReadOnly | AttrFlag::Hidden | AttrFlag::System | AttrFlag::VolumeID
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum DirEntryStatus {
+    /// name[0] == 0xE5
+    Free,
+    /// name[0] == 0，是接下来连续空条目之首
+    FreeHead,
+    /// 已被使用
+    Occupied,
+}
+
+pub fn dir_entry_name(dents: &[LongDirEntry]) -> String {
+    let mut bytes = Vec::new();
+
+    for dent in dents.iter().map(|dent| {
+        [
+            dent.name1.as_slice(),
+            dent.name2.as_slice(),
+            dent.name3.as_slice(),
+        ]
+    }) {
+        for &b in dent.iter().flat_map(|&s| s) {
+            if b == b'\0' {
+                break;
+            }
+            bytes.push(b);
+        }
+    }
+
+    String::from_utf8(bytes).expect("Valid UTF-8 dir_entry name")
 }
