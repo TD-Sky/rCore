@@ -85,6 +85,7 @@ impl SectorId {
         Self(raw)
     }
 
+    /// 拉伸扇区号至块ID
     pub fn block(self) -> usize {
         self.0 * (bpb().sector_bytes() / BLOCK_SIZE)
     }

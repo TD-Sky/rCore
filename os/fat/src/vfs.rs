@@ -1,9 +1,12 @@
+use core::mem;
+
 use alloc::vec::Vec;
 use enumflags2::BitFlags;
 
 use crate::volume::data::{
     dir_entry_name, AttrFlag, DirEntry, DirEntryStatus, LongDirEntry, ShortDirEntry,
 };
+use crate::volume::reserved::bpb;
 use crate::{sector, ClusterId, FatFileSystem, SectorId};
 
 /// 目录项会指向一个簇链表，这就是FAT文件系统中的inode。
@@ -18,6 +21,7 @@ pub struct Inode {
 }
 
 impl Inode {
+    /// 目录
     pub fn find(&self, relat_path: &str, sb: &FatFileSystem) -> Option<Self> {
         let mut cmps = relat_path.split('/');
         let mut inode = self.clone();
@@ -30,6 +34,34 @@ impl Inode {
             inode = cmp_inode;
         }
         inode.find_pwd(basename, sb)
+    }
+
+    /// 文件
+    pub fn read_at(&self, offset: usize, buf: &mut [u8], sb: &FatFileSystem) -> usize {
+        let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
+        let sector_size = bpb().sector_bytes();
+
+        let start = offset;
+        let end = (start + buf.len()).min(file_size);
+
+        if start > end {
+            return 0;
+        }
+
+        let mut read_size = 0;
+
+        let n_skip = start / sector_size;
+        let n_take = end / sector_size + 1;
+        for sid in sb.data_sectors(self.start_id).take(n_take).skip(n_skip) {
+            sector::get(sid).lock().map_slice(|data: &[u8]| {
+                let block_read_size = end.saturating_sub(read_size).min(sector_size);
+                buf[read_size..read_size + block_read_size]
+                    .copy_from_slice(&data[..block_read_size]);
+                read_size += block_read_size;
+            });
+        }
+
+        read_size
     }
 }
 
@@ -116,6 +148,15 @@ pub struct DirEntryPos {
 impl DirEntryPos {
     pub const fn new(sector: SectorId, nth: usize) -> Self {
         Self { sector, nth }
+    }
+
+    pub fn access<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&ShortDirEntry) -> R,
+    {
+        sector::get(self.sector)
+            .lock()
+            .map(self.nth * mem::size_of::<ShortDirEntry>(), f)
     }
 }
 

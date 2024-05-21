@@ -113,8 +113,12 @@ impl ShortDirEntry {
         }
     }
 
-    pub fn attr(&self) -> BitFlags<AttrFlag> {
+    pub const fn attr(&self) -> BitFlags<AttrFlag> {
         self.attr
+    }
+
+    pub const fn file_size(&self) -> usize {
+        self.file_size as usize
     }
 }
 
