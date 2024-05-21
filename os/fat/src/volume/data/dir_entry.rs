@@ -175,23 +175,21 @@ pub enum DirEntryStatus {
     Occupied,
 }
 
-pub fn dir_entry_name(dents: &[LongDirEntry]) -> String {
-    let mut bytes = Vec::new();
-
-    for dent in dents.iter().map(|dent| {
-        [
-            dent.name1.as_slice(),
-            dent.name2.as_slice(),
-            dent.name3.as_slice(),
-        ]
-    }) {
-        for &b in dent.iter().flat_map(|&s| s) {
-            if b == b'\0' {
-                break;
-            }
-            bytes.push(b);
-        }
-    }
+pub fn dir_entry_name(dirents: &[LongDirEntry]) -> String {
+    let bytes: Vec<u8> = dirents
+        .iter()
+        .flat_map(|dirent| {
+            [
+                dirent.name1.as_slice(),
+                dirent.name2.as_slice(),
+                dirent.name3.as_slice(),
+            ]
+            .into_iter()
+        })
+        .flatten()
+        .take_while(|b| **b != b'\0')
+        .cloned()
+        .collect();
 
     String::from_utf8(bytes).expect("Valid UTF-8 dir_entry name")
 }
