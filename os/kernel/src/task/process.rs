@@ -11,7 +11,7 @@ use super::RecycleAllocator;
 use super::TaskControlBlock;
 use crate::collections::SlotVec;
 use crate::fs::stdio::{Stdin, Stdout};
-use crate::fs::File;
+use crate::fs::{Directory, File};
 use crate::memory::{self, AddressSpace, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UpCell};
 use crate::trap::{trap_handler, TrapContext};
@@ -45,6 +45,7 @@ pub struct ProcessControlBlockInner {
     pub mutex_list: SlotVec<Arc<dyn Mutex>>,
     pub semaphore_list: SlotVec<Arc<Semaphore>>,
     pub condvar_list: SlotVec<Arc<Condvar>>,
+    pub cwd: Directory,
 }
 
 impl ProcessControlBlock {
@@ -78,6 +79,7 @@ impl ProcessControlBlock {
                     mutex_list: SlotVec::new(),
                     semaphore_list: SlotVec::new(),
                     condvar_list: SlotVec::new(),
+                    cwd: Directory::fat_root(),
                 })
             },
         });
@@ -125,6 +127,7 @@ impl ProcessControlBlock {
                     mutex_list: SlotVec::new(),
                     semaphore_list: SlotVec::new(),
                     condvar_list: SlotVec::new(),
+                    cwd: parent_inner.cwd.clone(),
                 })
             },
         });

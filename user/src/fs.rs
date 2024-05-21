@@ -1,4 +1,8 @@
+use core::cmp::Ordering;
+
 use alloc::ffi::CString;
+use alloc::string::String;
+use alloc::vec;
 use easy_fs::{DirEntry, Stat};
 use enumflags2::{bitflags, BitFlags};
 
@@ -66,6 +70,24 @@ pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
 pub fn remove(path: &str) -> Option<()> {
     let path = CString::new(path).unwrap();
     sys_unlinkat(&path).eq(&0).then_some(())
+}
+
+pub fn getcwd() -> String {
+    const TRY_LEN: usize = 32;
+    let mut buf = vec![0; TRY_LEN];
+    let len = sys_getcwd(&mut buf, TRY_LEN);
+    match len.cmp(&0) {
+        Ordering::Greater => {
+            buf.truncate(len as usize);
+        }
+        Ordering::Less => {
+            let len = -len as usize;
+            buf.resize(len, 0);
+            sys_getcwd(&mut buf, len);
+        }
+        Ordering::Equal => unreachable!(),
+    }
+    String::from_utf8(buf).expect("Valid UTF-8 CWD")
 }
 
 pub fn fstat(fd: usize) -> Option<Stat> {

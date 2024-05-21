@@ -15,6 +15,7 @@ const PIPE: usize = 59;
 const GETDENTS: usize = 61;
 const READ: usize = 63;
 const WRITE: usize = 64;
+const GETCWD: usize = 79;
 const FSTAT: usize = 80;
 const EXIT: usize = 93;
 const SLEEP: usize = 101;
@@ -170,16 +171,29 @@ pub fn sys_unlinkat(path: &CStr) -> isize {
     syscall(UNLINKAT, [path.as_ptr() as usize, 0, 0])
 }
 
+/// 将当前进程所在目录的绝对路径写入缓冲区
+///
+/// # 结果
+///
+/// * >0 => 实际的路径长度
+/// * <0 => 负·实际的路径长度
+/// * =0 => unreachable
+pub fn sys_getcwd(buf: &mut [u8], len: usize) -> isize {
+    syscall(GETCWD, [buf.as_mut_ptr() as usize, len, 0])
+}
+
 pub fn sys_fstat(fd: usize, st: &mut Stat) -> isize {
     syscall(FSTAT, [fd, ptr::from_mut(st) as usize, 0])
 }
 
 /// 将进程中一个已经打开的文件复制一份并分配到一个新的文件描述符中
 ///
-/// 参数
+/// # 参数
+///
 /// * fd: 已打开文件的描述符
 ///
-/// 结果
+/// # 结果
+///
 /// * -1 => 出现错误，可能是`fd`无效
 /// * new_fd => 文件副本的描述符
 pub fn sys_dup(fd: usize) -> isize {

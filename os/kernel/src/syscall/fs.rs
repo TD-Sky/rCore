@@ -201,3 +201,23 @@ pub fn sys_eventfd(initval: u64, flags: u32) -> isize {
     let mut process = process.inner().exclusive_access();
     process.fd_table.insert(event_fd) as isize
 }
+
+pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
+    let process = processor::current_process();
+    let process = process.inner().exclusive_access();
+
+    let token = process.user_token();
+    let mut path = UserBuffer::new(token, buf, len);
+
+    let cwd_len = process.cwd.path.len();
+
+    if len < cwd_len {
+        return -(cwd_len as isize);
+    }
+
+    for (b, &cb) in path.iter_mut().zip(process.cwd.path.as_bytes()) {
+        *b = cb;
+    }
+
+    cwd_len as isize
+}

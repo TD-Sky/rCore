@@ -21,6 +21,7 @@ const PIPE: usize = 59;
 const GETDENTS: usize = 61;
 const READ: usize = 63;
 const WRITE: usize = 64;
+const GETCWD: usize = 79;
 const FSTAT: usize = 80;
 const EXIT: usize = 93;
 const SLEEP: usize = 101;
@@ -59,23 +60,20 @@ const KEY_PRESSED: usize = 3001;
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
         DUP => sys_dup(args[0]),
-        UNLINKAT => sys_unlinkat(args[0] as *const u8),
-        LINKAT => sys_linkat(args[0] as *const u8, args[1] as *const u8),
-        OPEN => sys_open(args[0] as *const u8, args[1] as u32),
+        UNLINKAT => sys_unlinkat(args[0] as _),
+        LINKAT => sys_linkat(args[0] as _, args[1] as _),
+        OPEN => sys_open(args[0] as _, args[1] as u32),
         CLOSE => sys_close(args[0]),
-        PIPE => sys_pipe(args[0] as *mut usize),
-        GETDENTS => sys_getdents(args[0], args[1] as *mut DirEntry, args[2]),
-        READ => sys_read(args[0], args[1] as *mut u8, args[2]),
-        WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
-        FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
+        PIPE => sys_pipe(args[0] as _),
+        GETDENTS => sys_getdents(args[0], args[1] as _, args[2]),
+        READ => sys_read(args[0], args[1] as _, args[2]),
+        WRITE => sys_write(args[0], args[1] as _, args[2]),
+        GETCWD => sys_getcwd(args[0] as _, args[1]),
+        FSTAT => sys_fstat(args[0], args[1] as _),
         EXIT => sys_exit(args[0] as i32),
         SLEEP => sys_sleep(args[0]),
         YIELD => sys_yield(),
-        SIGACTION => sys_sigaction(
-            args[0] as u32,
-            args[1] as *const SignalAction,
-            args[2] as *mut SignalAction,
-        ),
+        SIGACTION => sys_sigaction(args[0] as u32, args[1] as _, args[2] as _),
         SIGPROCMASK => sys_sigprocmask(args[0] as u32),
         SIGRETURN => sys_sigreturn(),
         TIME => sys_get_time(),
@@ -84,10 +82,10 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         KILL => sys_kill(args[0], args[1] as u32),
         MUNMAP => sys_munmap(args[0], args[1]),
         FORK => sys_fork(),
-        EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
+        EXEC => sys_exec(args[0] as _, args[1] as _),
         MMAP => sys_mmap(args[0], args[1], args[2] as u8),
-        WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
-        SPAWN => sys_spawn(args[0] as *const u8),
+        WAITPID => sys_waitpid(args[0] as isize, args[1] as _),
+        SPAWN => sys_spawn(args[0] as _),
         SPAWN_THREAD => sys_spawn_thread(args[0], args[1]),
         GETTID => sys_gettid(),
         WAITTID => sys_waittid(args[0]),
