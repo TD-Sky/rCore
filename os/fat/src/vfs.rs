@@ -42,7 +42,7 @@ impl Inode {
         let sector_size = bpb().sector_bytes();
 
         let start = offset;
-        let end = (start + buf.len()).min(file_size);
+        let end = (start + buf.len()).min(file_size); // exclusive
 
         if start > end {
             return 0;
@@ -51,17 +51,50 @@ impl Inode {
         let mut read_size = 0;
 
         let n_skip = start / sector_size;
-        let n_take = end / sector_size + 1;
+        let n_take = end.div_ceil(sector_size);
         for sid in sb.data_sectors(self.start_id).take(n_take).skip(n_skip) {
+            let block_read_size = (end - read_size).min(sector_size);
             sector::get(sid).lock().map_slice(|data: &[u8]| {
-                let block_read_size = end.saturating_sub(read_size).min(sector_size);
                 buf[read_size..read_size + block_read_size]
-                    .copy_from_slice(&data[..block_read_size]);
-                read_size += block_read_size;
+                    .copy_from_slice(&data[..block_read_size])
             });
+            read_size += block_read_size;
         }
 
         read_size
+    }
+
+    /// 文件
+    pub fn write_at(&self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
+        let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
+        let sector_size = bpb().sector_bytes();
+
+        let start = offset;
+        let end = start + buf.len(); // exclusive
+
+        if end > file_size {
+            self.expand_to(file_size, end, sb);
+        }
+
+        let mut wrote_size = 0;
+
+        let n_skip = start / sector_size;
+        let n_take = end.div_ceil(sector_size);
+        for sid in sb.data_sectors(self.start_id).take(n_take).skip(n_skip) {
+            let block_write_size = (end - wrote_size).min(sector_size);
+            sector::get(sid).lock().map_mut_slice(|data: &mut [u8]| {
+                data[..block_write_size]
+                    .copy_from_slice(&buf[wrote_size..wrote_size + block_write_size])
+            });
+            wrote_size += block_write_size;
+        }
+
+        if end > file_size {
+            self.dirent_pos
+                .access_mut(|dirent| dirent.set_file_size(end));
+        }
+
+        wrote_size
     }
 }
 
@@ -137,10 +170,28 @@ impl Inode {
 
         None
     }
+
+    /// 块
+    fn expand_to(&self, old_size: usize, larger_size: usize, sb: &mut FatFileSystem) {
+        let sector_bytes = bpb().sector_bytes();
+
+        let old_sectors = old_size.div_ceil(sector_bytes);
+        let new_sectors = larger_size.div_ceil(sector_bytes);
+        let added_sectors = new_sectors - old_sectors;
+
+        let mut current = sb.fat().last(self.start_id).unwrap();
+        for _ in 0..added_sectors {
+            let next = sb.alloc_cluster().0;
+            unsafe {
+                sb.fat_mut().couple(current, next);
+            }
+            current = next;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct DirEntryPos {
+struct DirEntryPos {
     sector: SectorId,
     nth: usize,
 }
@@ -158,10 +209,19 @@ impl DirEntryPos {
             .lock()
             .map(self.nth * mem::size_of::<ShortDirEntry>(), f)
     }
+
+    pub fn access_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut ShortDirEntry) -> R,
+    {
+        sector::get(self.sector)
+            .lock()
+            .map_mut(self.nth * mem::size_of::<ShortDirEntry>(), f)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InodeKind {
+enum InodeKind {
     File,
     Directory,
 }

@@ -120,6 +120,10 @@ impl ShortDirEntry {
     pub const fn file_size(&self) -> usize {
         self.file_size as usize
     }
+
+    pub fn set_file_size(&mut self, size: usize) {
+        self.file_size = size as u32;
+    }
 }
 
 /// 可容纳名字的26个字节。

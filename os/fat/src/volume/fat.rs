@@ -25,41 +25,52 @@ impl FatArea {
     pub fn next(&self, id: ClusterId<u32>) -> Result<Option<ClusterId<u32>>, ClusterError> {
         let id = self.validate_id(id)?;
 
-        let (sid, idx) = self.cluster_id2pos(id);
-        match sector::get(sid).lock().map(
-            idx * mem::size_of::<ClusterId<u32>>(),
-            |cid: &ClusterId<u32>| cid.validate(),
-        ) {
+        match self.id2pos(id).access(|next_id| next_id.validate()) {
             Ok(cid) => Ok(Some(cid)),
             Err(ClusterError::Eof) => Ok(None),
             Err(e) => Err(e),
         }
     }
 
-    /// 寻找未分配的簇，并将其设为`EOF`
-    pub fn alloc(&mut self) -> Option<ClusterId<u32>> {
-        let mut range = self.range.clone();
+    /// 寻找簇链表的最后一个簇
+    pub fn last(&self, id: ClusterId<u32>) -> Result<ClusterId<u32>, ClusterError> {
+        let mut id = self.validate_id(id)?;
 
-        if let Some(cidx) =
-            sector::get(range.next()?)
-                .lock()
-                .map_mut_slice(|clusters: &mut [ClusterId<u32>]| {
-                    clusters
-                        .iter_mut()
-                        .enumerate()
-                        .skip(ClusterId::MIN.into())
-                        .find(|(_, cid)| **cid == ClusterId::FREE)
-                        .map(|(cidx, cid)| {
-                            *cid = ClusterId::EOF;
-                            cidx
-                        })
-                })
-        {
-            reserved::record_alloc();
-            return Some((cidx as u32).into());
+        while let Some(next_id) = self.next(id)? {
+            id = next_id;
         }
 
-        for (i, sid) in range.enumerate() {
+        Ok(id)
+    }
+
+    /// 寻找未分配的簇，并将其设为`EOF`。
+    ///
+    /// 此方法仅在FAT表做注册，不会初始化簇。
+    /// 若需要初始化簇，请调用[`FatFileSystem::alloc_cluster`]。
+    ///
+    /// [`FatFileSystem::alloc_cluster`]: crate::FatFileSystem::alloc_cluster
+    pub fn alloc(&mut self) -> Option<ClusterId<u32>> {
+        let mut range = self.range.clone().enumerate();
+
+        // 在FAT的第一个扇区，需要跳过[`ClusterId::MIN`]之前的簇ID
+        if let Some(cidx) = sector::get(range.next()?.1).lock().map_mut_slice(
+            |clusters: &mut [ClusterId<u32>]| {
+                clusters
+                    .iter_mut()
+                    .enumerate()
+                    .skip(ClusterId::MIN.into())
+                    .find(|(_, cid)| **cid == ClusterId::FREE)
+                    .map(|(cidx, cid)| {
+                        *cid = ClusterId::EOF;
+                        cidx
+                    })
+            },
+        ) {
+            reserved::record_alloc();
+            return Some(ClusterId::from(cidx as u32));
+        }
+
+        for (i, sid) in range {
             if let Some(cidx) =
                 sector::get(sid)
                     .lock()
@@ -75,11 +86,20 @@ impl FatArea {
                     })
             {
                 reserved::record_alloc();
-                return Some(Self::pos2cluster_id(i + 1, cidx));
+                return Some(ClusterId::from(i * cidx));
             }
         }
 
         None
+    }
+
+    /// 以前后顺序链接两个簇，为扩展分配准备的。
+    ///
+    /// # Safety
+    ///
+    /// 若`prev`不是尾簇，赋予其`next`的链接会导致链表的剩余部分丢失！
+    pub unsafe fn couple(&mut self, prev: ClusterId<u32>, next: ClusterId<u32>) {
+        self.id2pos(prev).access_mut(|next_id| *next_id = next);
     }
 
     /// 移除整个簇链表。
@@ -87,15 +107,11 @@ impl FatArea {
         let mut id = self.validate_id(id)?;
 
         loop {
-            let (sid, idx) = self.cluster_id2pos(id);
-            let is_eof = sector::get(sid).lock().map_mut(
-                idx * mem::size_of::<ClusterId<u32>>(),
-                |next_id: &mut ClusterId| {
-                    id = *next_id;
-                    *next_id = ClusterId::FREE;
-                    id == ClusterId::EOF
-                },
-            );
+            let is_eof = self.id2pos(id).access_mut(|next_id| {
+                id = *next_id;
+                *next_id = ClusterId::FREE;
+                id == ClusterId::EOF
+            });
             reserved::record_free();
             if is_eof {
                 break;
@@ -128,15 +144,36 @@ impl FatArea {
         })
     }
 
-    /// 返回簇编号实际所处的磁盘位置（扇区号 + 扇区内索引）
-    fn cluster_id2pos(&self, id: ClusterId<u32>) -> (SectorId, usize) {
-        (
-            self.get_sector(id),
-            u32::from(id) as usize % Self::sector_clusters(),
-        )
+    fn id2pos(&self, id: ClusterId<u32>) -> ClusterIdPos {
+        ClusterIdPos {
+            sector: self.get_sector(id),
+            nth: u32::from(id) as usize % Self::sector_clusters(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ClusterIdPos {
+    sector: SectorId,
+    nth: usize,
+}
+
+impl ClusterIdPos {
+    pub fn access<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&ClusterId) -> R,
+    {
+        sector::get(self.sector)
+            .lock()
+            .map(self.nth * mem::size_of::<ClusterId>(), f)
     }
 
-    const fn pos2cluster_id(sector_index: usize, cluster_index: usize) -> ClusterId<u32> {
-        ClusterId::new((sector_index * cluster_index) as u32)
+    pub fn access_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut ClusterId) -> R,
+    {
+        sector::get(self.sector)
+            .lock()
+            .map_mut(self.nth * mem::size_of::<ClusterId>(), f)
     }
 }

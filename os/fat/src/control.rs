@@ -5,7 +5,6 @@ use core::ops::Range;
 
 use block_dev::BlockDevice;
 
-use crate::util;
 use crate::volume::{
     data::DataArea,
     fat::FatArea,
@@ -43,6 +42,10 @@ impl FatFileSystem {
         &self.fat_area
     }
 
+    pub fn fat_mut(&mut self) -> &mut FatArea {
+        &mut self.fat_area
+    }
+
     pub const fn data(&self) -> &DataArea {
         &self.data_area
     }
@@ -50,7 +53,10 @@ impl FatFileSystem {
     pub fn alloc_cluster(&mut self) -> (ClusterId<u32>, Range<SectorId>) {
         let id = self.fat_area.alloc().unwrap();
         let sectors = self.data_area.cluster(id).unwrap();
-        util::zeroize_sectors(sectors.clone());
+
+        for sid in sectors.clone() {
+            sector::get(sid).lock().zeroize();
+        }
         (id, sectors)
     }
 
