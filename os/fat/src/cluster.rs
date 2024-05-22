@@ -65,7 +65,7 @@ impl ClusterId<u32> {
         Self(raw & 0x0FFF_FFFF)
     }
 
-    /// NOTE: 没有FAT提供的真实最大可用簇编号，无法得知全部保留簇
+    /// WARN: 没有FAT提供的真实最大可用簇编号，无法得知全部保留簇
     pub fn is_unavailable(&self) -> bool {
         *self < Self::MIN || (Self(0x0FFF_FFF8)..=Self(0x0FFF_FFFE)).contains(self)
     }

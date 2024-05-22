@@ -4,17 +4,20 @@
 //! 其中`0`表示簇未分配，`1`保留，
 //! 所以数据区第一个可用的簇编号（Bpb.root_clus）一般为2。
 
-use core::mem::ManuallyDrop;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::mem;
 
-use alloc::{string::String, vec::Vec};
 use enumflags2::{bitflags, BitFlags};
 
-use crate::ClusterId;
+use crate::{volume::reserved::bpb, ClusterId};
 
-/// 这是一个极度危险的类型，只应该在搜索目录项时使用
+/// 这是一个极度危险的类型，只应该在搜索目录项时使用。
+///
+/// 出于方便考虑，两个目录项都实现`Copy`，当C语言写吧。
 pub union DirEntry {
-    pub short: ManuallyDrop<ShortDirEntry>,
-    pub long: ManuallyDrop<LongDirEntry>,
+    pub short: ShortDirEntry,
+    pub long: LongDirEntry,
 }
 
 impl DirEntry {
@@ -22,16 +25,16 @@ impl DirEntry {
     ///
     /// 通过属性才能知晓目录项属于短还是长。
     pub unsafe fn attr(&self) -> BitFlags<AttrFlag> {
-        self.short.attr()
+        self.short.attr
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 #[repr(packed)]
 pub struct ShortDirEntry {
-    name: [u8; 11],
+    pub name: [u8; 11],
 
-    attr: BitFlags<AttrFlag>,
+    pub attr: BitFlags<AttrFlag>,
 
     /// Reserved, must be 0
     _ntres: u8,
@@ -70,7 +73,18 @@ pub struct ShortDirEntry {
 
 impl ShortDirEntry {
     pub fn cluster_id(&self) -> ClusterId<u32> {
-        (self.fst_clus_lo, self.fst_clus_hi).into()
+        let id: ClusterId<u32> = (self.fst_clus_lo, self.fst_clus_hi).into();
+        // NOTE: 目录项指向根目录时，其簇编号为0。
+        //       但我们需要有效的索引，所以直接提到[`ClusterId::MIN`]，
+        //       即真正的根目录的地址（绝大部分情况）。
+        id.max(ClusterId::MIN)
+    }
+
+    pub fn set_cluster_id(&mut self, mut id: ClusterId<u32>) {
+        if id == ClusterId::MIN {
+            id = ClusterId::FREE;
+        }
+        (self.fst_clus_lo, self.fst_clus_hi) = id.split();
     }
 
     pub fn checksum(&self) -> u8 {
@@ -113,10 +127,6 @@ impl ShortDirEntry {
         }
     }
 
-    pub const fn attr(&self) -> BitFlags<AttrFlag> {
-        self.attr
-    }
-
     pub const fn file_size(&self) -> usize {
         self.file_size as usize
     }
@@ -129,14 +139,14 @@ impl ShortDirEntry {
 /// 可容纳名字的26个字节。
 ///
 /// 目录项名称最长为255字节，所以最多用到10个长目录项。
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(packed)]
 pub struct LongDirEntry {
     /// 序号（1起）
     pub ord: u8,
     name1: [u8; 10],
     /// [`attr_long_name`]
-    attr: BitFlags<AttrFlag>,
+    _attr: BitFlags<AttrFlag>,
     /// 0
     _type: u8,
     /// 此项跟随的短名称目录项的校验和。
@@ -148,14 +158,32 @@ pub struct LongDirEntry {
     name3: [u8; 4],
 }
 
-impl LongDirEntry {
-    pub const LAST_MASK: u8 = 0b0100_0000;
+impl Default for LongDirEntry {
+    fn default() -> Self {
+        Self {
+            ord: 0,
+            name1: Default::default(),
+            _attr: Self::attr(),
+            _type: 0,
+            chksum: 0,
+            name2: Default::default(),
+            _fst_clus_lo: 0,
+            name3: Default::default(),
+        }
+    }
 }
 
 impl LongDirEntry {
+    pub const LAST_MASK: u8 = 0b0100_0000;
+
     pub fn attr() -> BitFlags<AttrFlag> {
         AttrFlag::ReadOnly | AttrFlag::Hidden | AttrFlag::System | AttrFlag::VolumeID
     }
+}
+
+impl LongDirEntry {
+    /// 可为名称容纳的字节数
+    const CAP: usize = 26;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,21 +211,64 @@ pub enum DirEntryStatus {
     Occupied,
 }
 
-pub fn dir_entry_name(dirents: &[LongDirEntry]) -> String {
+/// Converts [`LongDirEntry`] to directory entry name.
+///
+/// # 参数
+///
+/// - `dirents`: **正序排列**的长目录项。
+pub fn dirents2name(dirents: &[LongDirEntry]) -> String {
     let bytes: Vec<u8> = dirents
         .iter()
-        .flat_map(|dirent| {
-            [
-                dirent.name1.as_slice(),
-                dirent.name2.as_slice(),
-                dirent.name3.as_slice(),
-            ]
-            .into_iter()
-        })
+        .flat_map(|dirent| [dirent.name1.as_slice(), &dirent.name2, &dirent.name3].into_iter())
         .flatten()
         .take_while(|b| **b != b'\0')
         .cloned()
         .collect();
 
     String::from_utf8(bytes).expect("Valid UTF-8 dir_entry name")
+}
+
+/// Converts directory entry name to [`ShortDirEntry`] + [`Vec<LongDirEntry>`].
+///
+/// # 返回
+///
+/// - `ShortDirEntry`: 除了`name`，其它均为默认值。
+/// - `Vec<LongDirEntry>`: **反序排列**的长目录项，已全数赋值。
+pub fn name2dirents(name: &str) -> (ShortDirEntry, Vec<LongDirEntry>) {
+    let mut short = ShortDirEntry::default();
+    for (b, nb) in short.name.iter_mut().zip(name.as_bytes()) {
+        *b = nb.to_ascii_uppercase();
+    }
+
+    let chksum = short.checksum();
+
+    let mut longs: Vec<_> = name
+        .as_bytes()
+        .chunks(LongDirEntry::CAP)
+        .enumerate()
+        .map(|(i, bytes)| {
+            let mut long = LongDirEntry {
+                ord: (i + 1) as u8,
+                chksum,
+                ..Default::default()
+            };
+            for (b, &nb) in [long.name1.as_mut_slice(), &mut long.name2, &mut long.name3]
+                .into_iter()
+                .flatten()
+                .zip(bytes)
+            {
+                *b = nb;
+            }
+            long
+        })
+        .rev()
+        .collect();
+
+    longs[0].ord |= LongDirEntry::LAST_MASK;
+
+    (short, longs)
+}
+
+pub fn sector_dirents() -> usize {
+    bpb().sector_bytes() / mem::size_of::<ShortDirEntry>()
 }
