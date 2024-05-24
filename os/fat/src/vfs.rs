@@ -49,7 +49,7 @@ impl Inode {
         let start = offset;
         let end = (start + buf.len()).min(file_size); // exclusive
 
-        if start > end {
+        if start >= end {
             return 0;
         }
 
@@ -69,16 +69,50 @@ impl Inode {
         read_size
     }
 
+    /// 目录
+    ///
+    /// 在当前目录下创建文件。
+    pub fn touch(&mut self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+        let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::EOF)?;
+        Some(Self {
+            start_id,
+            dirent_pos,
+            kind: InodeKind::File,
+        })
+    }
+
     /// 文件
-    pub fn write_at(&self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
+    pub fn write_at(&mut self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
 
         let start = offset;
         let end = start + buf.len(); // exclusive
 
+        // Expand
         if end > file_size {
-            self.expand((end - file_size).div_ceil(sector_size), sb);
+            let added_sectors = (end - file_size).div_ceil(sector_size);
+            debug_assert!(added_sectors > 0);
+
+            let mut added_clusters = added_sectors.div_ceil(bpb().cluster_sectors());
+
+            let mut current = if self.start_id == ClusterId::EOF {
+                added_clusters -= 1;
+                self.start_id = sb.alloc_cluster().0;
+                self.dirent_pos
+                    .access_mut(|dirent| dirent.set_cluster_id(self.start_id));
+                self.start_id
+            } else {
+                sb.fat().last(self.start_id).unwrap()
+            };
+
+            for _ in 0..added_clusters {
+                let next = sb.alloc_cluster().0;
+                unsafe {
+                    sb.fat_mut().couple(current, next);
+                }
+                current = next;
+            }
         }
 
         let mut wrote_size = 0;
@@ -104,175 +138,12 @@ impl Inode {
 
     /// 目录
     ///
-    /// 在当前目录下创建指定名称的项。
-    pub fn mkdir_cwd(&mut self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
-        if self.find_cwd(name, sb).is_some() {
-            // TODO: 返回“文件已存在”的错误
-            return None;
-        }
-
-        let sector_dirents = sector_dirents();
-
-        let (mut short, longs) = name2dirents(name);
-        let dir_start_id = self.alloc_dir(&mut short, sb);
-
-        let n_long = longs.len();
-
-        let mut sectors = sb.data_sectors(self.start_id);
-        let mut prev_sector = None;
-
-        /* 尝试收集足够的连续中间槽 */
-        let mut slot_count = 0;
-        let mut discrete = false;
-        let pos = 'out: loop {
-            if let Some(sid) = sectors.next() {
-                let dirents = sector::get(sid);
-                let dirents = dirents.lock();
-                let dirents: &[DirEntry] = dirents.as_slice();
-
-                for (i, dirent) in dirents.iter().enumerate() {
-                    match unsafe { dirent.short.status() } {
-                        DirEntryStatus::Free => {
-                            slot_count += 1;
-
-                            if slot_count == n_long + 1 {
-                                break 'out Some(DirEntryPos::new(sid, i));
-                            }
-                        }
-                        DirEntryStatus::FreeHead => {
-                            slot_count = 0;
-                            break 'out Some(DirEntryPos::new(sid, i));
-                        }
-                        DirEntryStatus::Occupied => {
-                            slot_count = 0;
-                        }
-                    }
-                }
-
-                // NOTE: 有计数，但没中止，说明要去下一个扇区
-                //       继续收集中间槽
-                discrete = slot_count > 0;
-
-                prev_sector = Some(sid);
-            } else {
-                break 'out None;
-            }
-        };
-        if slot_count > 0 {
-            // NOTE: 上面的循环绝不会以`slot_count == 0`或
-            //       `slot_count == need_slots`之外的状态退出，
-            //       而且满足后者时，必定存在可用的中间槽位。
-            let start = pos.expect("A middle slot of directory entry");
-
-            if discrete {
-                let end_sector = prev_sector.unwrap();
-                // NOTE: 离散情况下，`start.nth`等于当前扇区的长目录项个数
-                let longs_in_prev = n_long - start.nth;
-
-                let (prev_longs, next_longs) = longs.split_at(longs_in_prev);
-
-                sector::get(end_sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[sector_dirents - longs_in_prev..].copy_from_slice(prev_longs)
-                    });
-
-                sector::get(start.sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[..start.nth].copy_from_slice(next_longs)
-                    });
-            } else {
-                sector::get(start.sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[start.nth - n_long..start.nth].copy_from_slice(&longs)
-                    });
-            }
-
-            start.access_mut(|dirent| *dirent = short);
-
-            return Some(Self {
-                start_id: dir_start_id,
-                dirent_pos: start,
-                kind: InodeKind::Directory,
-            });
-        }
-
-        /* 尝试利用尾空槽 */
-        if let Some(end) = pos {
-            let need_next_sectors = (n_long + 1).saturating_sub(sector_dirents - end.nth);
-            let start_nth = (end.nth + n_long) % sector_dirents; // inclusive
-
-            let start = if need_next_sectors == 0 {
-                // 终点和起点都在同一扇区
-                sector::get(end.sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[end.nth..start_nth].copy_from_slice(&longs)
-                    });
-                DirEntryPos::new(end.sector, start_nth)
-            } else {
-                // 终点和起点在相异的扇区
-                let longs_in_prev = sector_dirents - end.nth;
-
-                let (prev_longs, next_longs) = longs.split_at(longs_in_prev);
-
-                let start_sector = if let Some(sc) = sectors.next() {
-                    sc
-                } else {
-                    drop(sectors);
-                    let last_cid = sb.fat().last(self.start_id).unwrap();
-                    let (ncid, new_sectors) = sb.alloc_cluster();
-                    unsafe {
-                        sb.fat_mut().couple(last_cid, ncid);
-                    }
-                    new_sectors.start
-                };
-
-                sector::get(end.sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[sector_dirents - longs_in_prev..].copy_from_slice(prev_longs)
-                    });
-
-                sector::get(start_sector)
-                    .lock()
-                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
-                        dirents[..start_nth].copy_from_slice(next_longs)
-                    });
-
-                DirEntryPos::new(start_sector, start_nth)
-            };
-
-            start.access_mut(|dirent| *dirent = short);
-
-            return Some(Self {
-                start_id: dir_start_id,
-                dirent_pos: start,
-                kind: InodeKind::Directory,
-            });
-        }
-
-        /* 尝试分配新块 */
-        drop(sectors);
-        let last = sb.fat().last(self.start_id).unwrap();
-        let (ncid, sectors) = sb.alloc_cluster();
-        unsafe {
-            sb.fat_mut().couple(last, ncid);
-        }
-        sector::get(sectors.start)
-            .lock()
-            .map_mut_slice(|dirents: &mut [DirEntry]| {
-                for (dirent, long) in dirents.iter_mut().zip(longs) {
-                    dirent.long = long;
-                }
-                dirents[n_long].short = short;
-            });
-
+    /// 在当前目录下创建目录。
+    pub fn mkdir(&mut self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+        let (start_id, dirent_pos) = self.create(name, sb, Self::alloc_dir)?;
         Some(Self {
-            start_id: dir_start_id,
-            dirent_pos: DirEntryPos::new(sectors.start, n_long),
+            start_id,
+            dirent_pos,
             kind: InodeKind::Directory,
         })
     }
@@ -369,18 +240,172 @@ impl Inode {
         None
     }
 
-    /// 块
-    fn expand(&self, added_sectors: usize, sb: &mut FatFileSystem) {
-        let mut current = sb.fat().last(self.start_id).unwrap();
-        let added_clusters = added_sectors.div_ceil(bpb().cluster_sectors());
-
-        for _ in 0..added_clusters {
-            let next = sb.alloc_cluster().0;
-            unsafe {
-                sb.fat_mut().couple(current, next);
-            }
-            current = next;
+    /// 目录
+    ///
+    /// 在当前目录下创建目录项。
+    fn create(
+        &mut self,
+        name: &str,
+        sb: &mut FatFileSystem,
+        gen_cid: fn(&Self, &mut ShortDirEntry, &mut FatFileSystem) -> ClusterId<u32>,
+    ) -> Option<(ClusterId<u32>, DirEntryPos)> {
+        if self.find_cwd(name, sb).is_some() {
+            // TODO: 返回“文件已存在”的错误
+            return None;
         }
+
+        let sector_dirents = sector_dirents();
+
+        let (mut short, longs) = name2dirents(name);
+        let cluster_id = gen_cid(self, &mut short, sb);
+
+        let n_long = longs.len();
+
+        let mut sectors = sb.data_sectors(self.start_id);
+        let mut prev_sector = None;
+
+        /* 尝试收集足够的连续中间槽 */
+        let mut slot_count = 0;
+        let mut discrete = false;
+        let pos = 'out: loop {
+            if let Some(sid) = sectors.next() {
+                let dirents = sector::get(sid);
+                let dirents = dirents.lock();
+                let dirents: &[DirEntry] = dirents.as_slice();
+
+                for (i, dirent) in dirents.iter().enumerate() {
+                    match unsafe { dirent.short.status() } {
+                        DirEntryStatus::Free => {
+                            slot_count += 1;
+
+                            if slot_count == n_long + 1 {
+                                break 'out Some(DirEntryPos::new(sid, i));
+                            }
+                        }
+                        DirEntryStatus::FreeHead => {
+                            slot_count = 0;
+                            break 'out Some(DirEntryPos::new(sid, i));
+                        }
+                        DirEntryStatus::Occupied => {
+                            slot_count = 0;
+                        }
+                    }
+                }
+
+                // NOTE: 有计数，但没中止，说明要去下一个扇区
+                //       继续收集中间槽
+                discrete = slot_count > 0;
+
+                prev_sector = Some(sid);
+            } else {
+                break 'out None;
+            }
+        };
+        if slot_count > 0 {
+            // NOTE: 上面的循环绝不会以`slot_count == 0`或
+            //       `slot_count == need_slots`之外的状态退出，
+            //       而且满足后者时，必定存在可用的中间槽位。
+            let start = pos.expect("A middle slot of directory entry");
+
+            if discrete {
+                let end_sector = prev_sector.unwrap();
+                // NOTE: 离散情况下，`start.nth`等于当前扇区的长目录项个数
+                let longs_in_prev = n_long - start.nth;
+
+                let (prev_longs, next_longs) = longs.split_at(longs_in_prev);
+
+                sector::get(end_sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[sector_dirents - longs_in_prev..].copy_from_slice(prev_longs)
+                    });
+
+                sector::get(start.sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[..start.nth].copy_from_slice(next_longs)
+                    });
+            } else {
+                sector::get(start.sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[start.nth - n_long..start.nth].copy_from_slice(&longs)
+                    });
+            }
+
+            start.access_mut(|dirent| *dirent = short);
+
+            return Some((cluster_id, start));
+        }
+
+        /* 尝试利用尾空槽 */
+        if let Some(end) = pos {
+            let need_next_sectors = (n_long + 1).saturating_sub(sector_dirents - end.nth);
+            let start_nth = (end.nth + n_long) % sector_dirents; // inclusive
+
+            let start = if need_next_sectors == 0 {
+                // 终点和起点都在同一扇区
+                sector::get(end.sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[end.nth..start_nth].copy_from_slice(&longs)
+                    });
+                DirEntryPos::new(end.sector, start_nth)
+            } else {
+                // 终点和起点在相异的扇区
+                let longs_in_prev = sector_dirents - end.nth;
+
+                let (prev_longs, next_longs) = longs.split_at(longs_in_prev);
+
+                let start_sector = if let Some(sc) = sectors.next() {
+                    sc
+                } else {
+                    drop(sectors);
+                    let last_cid = sb.fat().last(self.start_id).unwrap();
+                    let (ncid, new_sectors) = sb.alloc_cluster();
+                    unsafe {
+                        sb.fat_mut().couple(last_cid, ncid);
+                    }
+                    new_sectors.start
+                };
+
+                sector::get(end.sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[sector_dirents - longs_in_prev..].copy_from_slice(prev_longs)
+                    });
+
+                sector::get(start_sector)
+                    .lock()
+                    .map_mut_slice(|dirents: &mut [LongDirEntry]| {
+                        dirents[..start_nth].copy_from_slice(next_longs)
+                    });
+
+                DirEntryPos::new(start_sector, start_nth)
+            };
+
+            start.access_mut(|dirent| *dirent = short);
+
+            return Some((cluster_id, start));
+        }
+
+        /* 尝试分配新块 */
+        drop(sectors);
+        let last = sb.fat().last(self.start_id).unwrap();
+        let (ncid, sectors) = sb.alloc_cluster();
+        unsafe {
+            sb.fat_mut().couple(last, ncid);
+        }
+        sector::get(sectors.start)
+            .lock()
+            .map_mut_slice(|dirents: &mut [DirEntry]| {
+                for (dirent, long) in dirents.iter_mut().zip(longs) {
+                    dirent.long = long;
+                }
+                dirents[n_long].short = short;
+            });
+
+        Some((cluster_id, DirEntryPos::new(sectors.start, n_long)))
     }
 
     fn alloc_dir(&self, dir: &mut ShortDirEntry, sb: &mut FatFileSystem) -> ClusterId<u32> {
