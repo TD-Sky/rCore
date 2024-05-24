@@ -1,3 +1,4 @@
+use crate::volume::reserved::Bpb;
 use crate::{sector, SectorId};
 
 /// # 文件系统信息
@@ -28,6 +29,20 @@ pub struct FsInfo {
 
     /// 尾签名 0xAA550000
     trail_sig: u32,
+}
+
+impl FsInfo {
+    pub fn new(bpb: &Bpb) -> Self {
+        Self {
+            lead_sig: 0x41615252,
+            _reserved1: [0; 480],
+            struc_sig: 0x61417272,
+            free_count: bpb.total_clusters() as u32,
+            _nxt_free: 0xFFFFFFFF,
+            _reserved2: Default::default(),
+            trail_sig: 0xAA550000,
+        }
+    }
 }
 
 pub fn free_count() {

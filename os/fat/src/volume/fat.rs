@@ -14,9 +14,14 @@ impl FatArea {
     pub fn new(bpb: &Bpb) -> Self {
         let start = bpb.fat_area_sector();
         let end = start + bpb.fat_count() * bpb.fat_sectors();
+
         Self {
             range: Range { start, end },
         }
+    }
+
+    pub fn range(&self) -> Range<SectorId> {
+        self.range.clone()
     }
 
     /// 获取下一个簇编号。
@@ -43,6 +48,21 @@ impl FatArea {
         Ok(id)
     }
 
+    /// 分配根目录
+    pub fn alloc_root(&mut self) {
+        sector::get(self.range.start)
+            .lock()
+            .map_mut_slice(|cids: &mut [ClusterId<u32>]| {
+                cids[0] = ClusterId::new(0xFF_FF_FF_00 + bpb().media as u32);
+                // WARN: 标准中要求FAT[1]除了标志位，其它均设为1，
+                //       而`ClusterId::new`内部会进行一次掩码，应该没关系？
+                cids[1] = ClusterId::new((Self::SET_CLN_SHUT + Self::SET_HRD_ERR) | u32::MAX);
+                cids[2] = ClusterId::EOF;
+            });
+
+        reserved::record_alloc();
+    }
+
     /// 寻找未分配的簇，并将其设为`EOF`。
     ///
     /// 此方法仅在FAT表做注册，不会初始化簇。
@@ -50,27 +70,9 @@ impl FatArea {
     ///
     /// [`FatFileSystem::alloc_cluster`]: crate::FatFileSystem::alloc_cluster
     pub fn alloc(&mut self) -> Option<ClusterId<u32>> {
-        let mut range = self.range.clone().enumerate();
+        let sector_clusters = Self::sector_clusters();
 
-        // 在FAT的第一个扇区，需要跳过[`ClusterId::MIN`]之前的簇ID
-        if let Some(cidx) = sector::get(range.next()?.1).lock().map_mut_slice(
-            |clusters: &mut [ClusterId<u32>]| {
-                clusters
-                    .iter_mut()
-                    .enumerate()
-                    .skip(ClusterId::MIN.into())
-                    .find(|(_, cid)| **cid == ClusterId::FREE)
-                    .map(|(cidx, cid)| {
-                        *cid = ClusterId::EOF;
-                        cidx
-                    })
-            },
-        ) {
-            reserved::record_alloc();
-            return Some(ClusterId::from(cidx as u32));
-        }
-
-        for (i, sid) in range {
+        for (i, sid) in self.range.clone().enumerate() {
             if let Some(cidx) =
                 sector::get(sid)
                     .lock()
@@ -86,7 +88,7 @@ impl FatArea {
                     })
             {
                 reserved::record_alloc();
-                return Some(ClusterId::from(i * cidx));
+                return Some(ClusterId::from(i * sector_clusters + cidx));
             }
         }
 
@@ -123,6 +125,9 @@ impl FatArea {
 }
 
 impl FatArea {
+    const SET_CLN_SHUT: u32 = 0x08000000;
+    const SET_HRD_ERR: u32 = 0x04000000;
+
     /// 一个扇区能容纳多少条簇编号
     fn sector_clusters() -> usize {
         bpb().sector_bytes() / mem::size_of::<u32>()

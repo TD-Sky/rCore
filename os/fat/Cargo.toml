@@ -8,3 +8,4 @@ enumflags2 = { workspace = true }
 spin = { workspace = true, features = ["spin_mutex", "lazy"] }
 block-dev = { workspace = true }
 derive_more = { workspace = true, features = ["add", "from", "into"] }
+log = { workspace = true }

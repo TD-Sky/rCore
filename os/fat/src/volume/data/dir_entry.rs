@@ -88,17 +88,23 @@ impl ShortDirEntry {
     }
 
     pub fn checksum(&self) -> u8 {
-        Self::checksum_from(self.name.as_slice())
+        Self::checksum_from(&self.name)
     }
 
     pub fn checksum_from<'a>(bytes: impl IntoIterator<Item = &'a u8>) -> u8 {
-        let mut arr = [0; 8];
+        let mut arr = [0; 11];
         for (a, &b) in arr.iter_mut().zip(bytes) {
             *a = b;
         }
-        arr.iter().rev().fold(0, |sum, b| {
-            (if sum & 1 != 0 { 0x80 } else { 0 }) + (sum >> 1) + *b
-        })
+        log::trace!("Input bytes: {arr:?}");
+        let checksum = arr.iter().fold(0, |sum, &b| {
+            // NOTE: The operation is an unsigned char rotate right
+            (if sum & 1 != 0 { 0x80 } else { 0u8 })
+                .wrapping_add(sum >> 1)
+                .wrapping_add(b)
+        });
+        log::trace!("checksum={checksum:?}");
+        checksum
     }
 
     pub fn new_directory(name: &str, id: ClusterId<u32>) -> Self {

@@ -22,6 +22,12 @@ pub struct Inode {
 }
 
 impl Inode {
+    pub const ROOT: Self = Self {
+        start_id: ClusterId::MIN,
+        dirent_pos: DirEntryPos::ROOT,
+        kind: InodeKind::Directory,
+    };
+
     /// 目录
     ///
     /// # 参数
@@ -72,8 +78,9 @@ impl Inode {
     /// 目录
     ///
     /// 在当前目录下创建文件。
-    pub fn touch(&mut self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+    pub fn touch(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
         let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::EOF)?;
+        sector::sync_all();
         Some(Self {
             start_id,
             dirent_pos,
@@ -82,6 +89,8 @@ impl Inode {
     }
 
     /// 文件
+    ///
+    /// 随机写入，对于空文件会分配有效的起始簇编号再写入。
     pub fn write_at(&mut self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
@@ -139,8 +148,9 @@ impl Inode {
     /// 目录
     ///
     /// 在当前目录下创建目录。
-    pub fn mkdir(&mut self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+    pub fn mkdir(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
         let (start_id, dirent_pos) = self.create(name, sb, Self::alloc_dir)?;
+        sector::sync_all();
         Some(Self {
             start_id,
             dirent_pos,
@@ -244,7 +254,7 @@ impl Inode {
     ///
     /// 在当前目录下创建目录项。
     fn create(
-        &mut self,
+        &self,
         name: &str,
         sb: &mut FatFileSystem,
         gen_cid: fn(&Self, &mut ShortDirEntry, &mut FatFileSystem) -> ClusterId<u32>,
@@ -438,6 +448,9 @@ struct DirEntryPos {
 }
 
 impl DirEntryPos {
+    /// 根目录性质特殊，目录项位置无关紧要，占个位就行。
+    pub const ROOT: Self = DirEntryPos::new(SectorId::new(0), 0);
+
     pub const fn new(sector: SectorId, nth: usize) -> Self {
         Self { sector, nth }
     }

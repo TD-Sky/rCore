@@ -43,6 +43,15 @@ pub fn get(id: SectorId) -> Arc<Mutex<Sector>> {
     manager().get(id)
 }
 
+#[inline]
+pub fn sync_all() {
+    manager()
+        .queue
+        .lock()
+        .iter()
+        .for_each(|(_, sector)| sector.lock().sync())
+}
+
 /// 内存中的扇区
 #[derive(Debug)]
 pub struct Sector {
