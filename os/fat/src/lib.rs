@@ -5,13 +5,13 @@ extern crate alloc;
 
 mod cluster;
 mod control;
+mod inode;
 mod sector;
-mod vfs;
 pub mod volume;
 
 pub use self::{
     cluster::{ClusterError, ClusterId},
     control::FatFileSystem,
+    inode::Inode,
     sector::SectorId,
-    vfs::Inode,
 };

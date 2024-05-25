@@ -43,6 +43,11 @@ impl FsInfo {
             trail_sig: 0xAA550000,
         }
     }
+
+    #[inline]
+    pub const fn free_count(&self) -> usize {
+        self.free_count as usize
+    }
 }
 
 pub fn free_count() {

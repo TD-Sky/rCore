@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+vfs = { workspace = true }
+fat = { workspace = true }
 easy-fs = { workspace = true }
 buddy_system_allocator = { workspace = true }
 enumflags2 = { workspace = true }

@@ -1,8 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["kernel", "easy-fs", "fat", "block-dev"]
+members = ["kernel", "easy-fs", "fat", "block-dev", "vfs"]
 
 [workspace.dependencies]
+vfs = { path = "vfs" }                                       # kernel, fat
 easy-fs = { path = "easy-fs" }                               # kernel
 fat = { path = "fat" }                                       # kernel
 block-dev = { path = "block-dev" }                           # kernel, easy-fs, fat

@@ -4,6 +4,7 @@ use core::mem;
 use core::ops::Range;
 
 use block_dev::BlockDevice;
+use vfs::StatFs;
 
 use crate::volume::{
     data::DataArea,
@@ -115,6 +116,29 @@ impl FatFileSystem {
             control: self,
         }
         .flatten()
+    }
+
+    pub fn statfs(&self) -> StatFs {
+        let bpb = bpb();
+        let cluster_sectors = bpb.cluster_sectors() as u64;
+        let files = bpb.total_clusters() as u64;
+
+        sector::get(SectorId::new(1))
+            .lock()
+            .map(0, |fs_info: &FsInfo| {
+                let blocks_free = fs_info.free_count() as u64 * cluster_sectors;
+
+                StatFs {
+                    block_size: bpb.sector_bytes() as u64,
+                    blocks: files * cluster_sectors as u64,
+                    blocks_free,
+                    blocks_available: blocks_free,
+                    files,
+                    files_free: fs_info.free_count() as u64,
+                    name_cap: 255,
+                    ..Default::default()
+                }
+            })
     }
 }
 
