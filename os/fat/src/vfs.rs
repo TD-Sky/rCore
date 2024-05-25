@@ -79,7 +79,7 @@ impl Inode {
     ///
     /// 在当前目录下创建文件。
     pub fn touch(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
-        let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::EOF)?;
+        let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::FREE)?;
         sector::sync_all();
         Some(Self {
             start_id,
@@ -105,7 +105,8 @@ impl Inode {
 
             let mut added_clusters = added_sectors.div_ceil(bpb().cluster_sectors());
 
-            let mut current = if self.start_id == ClusterId::EOF {
+            let mut current = if self.start_id == ClusterId::FREE {
+                /* 空文件 */
                 added_clusters -= 1;
                 self.start_id = sb.alloc_cluster().0;
                 self.dirent_pos
@@ -429,13 +430,8 @@ impl Inode {
                 cwd.name.fill(0);
                 cwd.name[0] = b'.';
 
-                let mut parent = ShortDirEntry::default();
-                parent.set_cluster_id(self.start_id);
-                parent.attr |= AttrFlag::Directory;
-                parent.name[..2].copy_from_slice(b"..");
-
                 dirents[0] = cwd;
-                dirents[1] = parent;
+                dirents[1] = ShortDirEntry::new_parent(self.start_id);
             });
         ncid
     }

@@ -72,18 +72,36 @@ pub struct ShortDirEntry {
 }
 
 impl ShortDirEntry {
-    pub fn cluster_id(&self) -> ClusterId<u32> {
-        let id: ClusterId<u32> = (self.fst_clus_lo, self.fst_clus_hi).into();
-        // NOTE: 目录项指向根目录时，其簇编号为0。
-        //       但我们需要有效的索引，所以直接提到[`ClusterId::MIN`]，
-        //       即真正的根目录的地址（绝大部分情况）。
-        id.max(ClusterId::MIN)
+    /// 创建一个簇编号为`pid`的父目录项(..)
+    pub fn new_parent(mut pid: ClusterId<u32>) -> Self {
+        let mut dirent = Self::default();
+
+        // 若此父目录为根，则使用[`ClusterId::FREE`]
+        if pid == ClusterId::MIN {
+            pid = ClusterId::FREE;
+        }
+        dirent.set_cluster_id(pid);
+
+        dirent.attr |= AttrFlag::Directory;
+        dirent.name[..2].copy_from_slice(b"..");
+        dirent
     }
 
-    pub fn set_cluster_id(&mut self, mut id: ClusterId<u32>) {
-        if id == ClusterId::MIN {
-            id = ClusterId::FREE;
+    pub fn cluster_id(&self) -> ClusterId<u32> {
+        let id: ClusterId<u32> = (self.fst_clus_lo, self.fst_clus_hi).into();
+
+        if self.attr.contains(AttrFlag::Directory) {
+            // NOTE: 相对目录项指向根目录时，其簇编号为0。
+            //       但我们需要有效的索引，所以直接提到[`ClusterId::MIN`]，
+            //       即真正的根目录的地址（绝大部分情况）。
+            id.max(ClusterId::MIN)
+        } else {
+            /* 新创的空文件ID为[`ClusterId::FREE`]，直接返回无妨 */
+            id
         }
+    }
+
+    pub fn set_cluster_id(&mut self, id: ClusterId<u32>) {
         (self.fst_clus_lo, self.fst_clus_hi) = id.split();
     }
 
