@@ -105,7 +105,7 @@ impl FatArea {
     }
 
     /// 移除整个簇链表。
-    pub fn remove(&mut self, id: ClusterId<u32>) -> Result<(), ClusterError> {
+    pub fn dealloc(&mut self, id: ClusterId<u32>) -> Result<(), ClusterError> {
         let mut id = self.validate_id(id)?;
 
         loop {

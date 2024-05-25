@@ -34,6 +34,8 @@ impl Inode {
     ///
     /// `relat_path`: 相对于[`Inode`]的相对路径。
     pub fn find(&self, relat_path: &str, sb: &FatFileSystem) -> Option<Self> {
+        debug_assert_eq!(self.kind, InodeKind::Directory);
+
         let mut cmps = relat_path.split('/');
         let mut inode = self.clone();
         let basename = cmps.next_back()?;
@@ -49,6 +51,8 @@ impl Inode {
 
     /// 文件
     pub fn read_at(&self, offset: usize, buf: &mut [u8], sb: &FatFileSystem) -> usize {
+        debug_assert_eq!(self.kind, InodeKind::File);
+
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
 
@@ -79,6 +83,8 @@ impl Inode {
     ///
     /// 在当前目录下创建文件。
     pub fn touch(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+        debug_assert_eq!(self.kind, InodeKind::Directory);
+
         let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::FREE)?;
         sector::sync_all();
         Some(Self {
@@ -92,6 +98,8 @@ impl Inode {
     ///
     /// 随机写入，对于空文件会分配有效的起始簇编号再写入。
     pub fn write_at(&mut self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
+        debug_assert_eq!(self.kind, InodeKind::File);
+
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
 
@@ -146,10 +154,24 @@ impl Inode {
         wrote_size
     }
 
+    /// 文件
+    pub fn clear(&mut self, sb: &mut FatFileSystem) {
+        debug_assert_eq!(self.kind, InodeKind::File);
+
+        // 跳过空文件
+        if self.start_id != ClusterId::FREE {
+            sb.fat_mut().dealloc(self.start_id).unwrap();
+            self.start_id = ClusterId::FREE;
+            self.dirent_pos.access_mut(|dirent| dirent.set_file_size(0));
+        }
+    }
+
     /// 目录
     ///
     /// 在当前目录下创建目录。
     pub fn mkdir(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
+        debug_assert_eq!(self.kind, InodeKind::Directory);
+
         let (start_id, dirent_pos) = self.create(name, sb, Self::alloc_dir)?;
         sector::sync_all();
         Some(Self {
