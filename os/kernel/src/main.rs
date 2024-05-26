@@ -8,6 +8,7 @@
 #![feature(riscv_ext_intrinsics)]
 #![feature(let_chains)]
 #![feature(const_binary_heap_constructor)]
+#![feature(maybe_uninit_as_bytes)]
 
 extern crate alloc;
 

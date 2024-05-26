@@ -1,5 +1,5 @@
 #[derive(Debug, Default)]
-#[repr(C)]
+#[repr(C, align(64))]
 pub struct StatFs {
     /// Type of filesystem
     pub _ty: u64,

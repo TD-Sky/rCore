@@ -32,6 +32,12 @@ impl From<ClusterId<u32>> for u32 {
     }
 }
 
+impl From<ClusterId<u32>> for u64 {
+    fn from(id: ClusterId<u32>) -> Self {
+        id.0 as u64
+    }
+}
+
 impl From<ClusterId<u32>> for usize {
     fn from(id: ClusterId<u32>) -> Self {
         id.0 as usize

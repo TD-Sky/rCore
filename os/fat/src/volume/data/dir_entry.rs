@@ -158,6 +158,10 @@ impl ShortDirEntry {
     pub fn set_file_size(&mut self, size: usize) {
         self.file_size = size as u32;
     }
+
+    pub fn is_relative(&self) -> bool {
+        self.name == *b".          " || self.name == *b"..         "
+    }
 }
 
 /// 可容纳名字的26个字节。
@@ -200,6 +204,7 @@ impl Default for LongDirEntry {
 impl LongDirEntry {
     pub const LAST_MASK: u8 = 0b0100_0000;
 
+    #[inline]
     pub fn attr() -> BitFlags<AttrFlag> {
         AttrFlag::ReadOnly | AttrFlag::Hidden | AttrFlag::System | AttrFlag::VolumeID
     }

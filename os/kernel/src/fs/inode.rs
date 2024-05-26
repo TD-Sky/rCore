@@ -1,12 +1,16 @@
+use alloc::slice;
 use alloc::sync::Arc;
-
 use alloc::vec::Vec;
+use core::mem;
+use core::ptr;
+
 use enumflags2::bitflags;
 use enumflags2::BitFlags;
 use fat::FatFileSystem;
 use fat::Inode;
 use fat::ROOT;
 use spin::Lazy;
+use vfs::CDirEntry;
 use vfs::StatFs;
 
 use super::File;
@@ -110,6 +114,48 @@ impl File for OSInode {
     fn stat(&self) -> StatFs {
         FS.exclusive_access().statfs()
     }
+
+    fn getdents(&self, mut buf: UserBuffer, len: usize) -> usize {
+        let mut inner = self.inner.exclusive_access();
+        let dirents = inner.inode.ls_at(inner.offset, len, &FS.exclusive_access());
+        let read = dirents.len();
+
+        let name_ptrs: Vec<_> = buf
+            .transmute_slice::<CDirEntry>()
+            .into_iter()
+            .take(read)
+            .map(|c_dirent| c_dirent.name)
+            .collect();
+
+        for (&name_ptr, dirent) in name_ptrs.iter().zip(&dirents) {
+            let mut name_buf = UserBuffer::new(buf.token(), name_ptr.cast(), CDirEntry::NAME_CAP);
+            for (cnb, &dnb) in name_buf.iter_mut().zip(dirent.name.as_bytes()) {
+                *cnb = dnb;
+            }
+        }
+
+        let dirents: Vec<_> = dirents
+            .iter()
+            .zip(name_ptrs)
+            .map(|(dirent, name)| CDirEntry {
+                inode: dirent.inode,
+                ty: dirent.ty,
+                name,
+            })
+            .collect();
+
+        for (b, &db) in buf.iter_mut().zip(dirents.iter().flat_map(|dirent| unsafe {
+            slice::from_raw_parts(
+                ptr::from_ref(&dirent).cast::<u8>(),
+                mem::size_of::<CDirEntry>(),
+            )
+        })) {
+            *b = db;
+        }
+
+        inner.offset += read;
+        read
+    }
 }
 
 #[rustfmt::skip]
@@ -168,6 +214,7 @@ pub fn open_file(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> 
                     } else {
                         ROOT.touch(relat_path, &mut fs)
                     }
+                    .ok()
                     .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
                 })
                 .flatten()

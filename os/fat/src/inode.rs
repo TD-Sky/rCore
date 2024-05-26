@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use core::mem;
-
-use enumflags2::BitFlags;
+use vfs::DirEntryType;
 
 use crate::volume::data::{
     dirents2name, name2dirents, sector_dirents, AttrFlag, DirEntry, DirEntryStatus, LongDirEntry,
@@ -13,7 +12,7 @@ use crate::{sector, ClusterId, FatFileSystem, SectorId};
 pub static ROOT: Inode = Inode {
     start_id: ClusterId::MIN,
     dirent_pos: DirEntryPos::ROOT,
-    kind: InodeKind::Directory,
+    ty: DirEntryType::Directory,
 };
 
 /// 目录项会指向一个簇链表，这就是FAT文件系统中的inode。
@@ -24,7 +23,7 @@ pub static ROOT: Inode = Inode {
 pub struct Inode {
     start_id: ClusterId<u32>,
     dirent_pos: DirEntryPos,
-    kind: InodeKind,
+    ty: DirEntryType,
 }
 
 impl Inode {
@@ -34,14 +33,14 @@ impl Inode {
     ///
     /// `relat_path`: 相对于[`Inode`]的相对路径。
     pub fn find(&self, relat_path: &str, sb: &FatFileSystem) -> Option<Self> {
-        debug_assert_eq!(self.kind, InodeKind::Directory);
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
 
         let mut cmps = relat_path.split('/');
         let mut inode = self.clone();
         let basename = cmps.next_back()?;
         for cmp in cmps {
             let cmp_inode = inode.find_cwd(cmp, sb)?;
-            if cmp_inode.kind != InodeKind::Directory {
+            if cmp_inode.ty != DirEntryType::Directory {
                 return None;
             }
             inode = cmp_inode;
@@ -51,7 +50,7 @@ impl Inode {
 
     /// 文件
     pub fn read_at(&self, offset: usize, buf: &mut [u8], sb: &FatFileSystem) -> usize {
-        debug_assert_eq!(self.kind, InodeKind::File);
+        debug_assert_eq!(self.ty, DirEntryType::Regular);
 
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
@@ -82,15 +81,15 @@ impl Inode {
     /// 目录
     ///
     /// 在当前目录下创建文件。
-    pub fn touch(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
-        debug_assert_eq!(self.kind, InodeKind::Directory);
+    pub fn touch(&self, name: &str, sb: &mut FatFileSystem) -> Result<Self, vfs::Error> {
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
 
         let (start_id, dirent_pos) = self.create(name, sb, |_, _, _| ClusterId::FREE)?;
         sector::sync_all();
-        Some(Self {
+        Ok(Self {
             start_id,
             dirent_pos,
-            kind: InodeKind::File,
+            ty: DirEntryType::Regular,
         })
     }
 
@@ -98,7 +97,7 @@ impl Inode {
     ///
     /// 随机写入，对于空文件会分配有效的起始簇编号再写入。
     pub fn write_at(&mut self, offset: usize, buf: &[u8], sb: &mut FatFileSystem) -> usize {
-        debug_assert_eq!(self.kind, InodeKind::File);
+        debug_assert_eq!(self.ty, DirEntryType::Regular);
 
         let file_size = self.dirent_pos.access(ShortDirEntry::file_size);
         let sector_size = bpb().sector_bytes();
@@ -156,7 +155,7 @@ impl Inode {
 
     /// 文件
     pub fn clear(&mut self, sb: &mut FatFileSystem) {
-        debug_assert_eq!(self.kind, InodeKind::File);
+        debug_assert_eq!(self.ty, DirEntryType::Regular);
 
         // 跳过空文件
         if self.start_id != ClusterId::FREE {
@@ -169,16 +168,112 @@ impl Inode {
     /// 目录
     ///
     /// 在当前目录下创建目录。
-    pub fn mkdir(&self, name: &str, sb: &mut FatFileSystem) -> Option<Self> {
-        debug_assert_eq!(self.kind, InodeKind::Directory);
+    pub fn mkdir(&self, name: &str, sb: &mut FatFileSystem) -> Result<Self, vfs::Error> {
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
 
         let (start_id, dirent_pos) = self.create(name, sb, Self::alloc_dir)?;
         sector::sync_all();
-        Some(Self {
+        Ok(Self {
             start_id,
             dirent_pos,
-            kind: InodeKind::Directory,
+            ty: DirEntryType::Directory,
         })
+    }
+
+    /// 目录
+    ///
+    /// 读取at之后的目录项，最多为count个。
+    pub fn ls_at(&self, at: usize, count: usize, sb: &FatFileSystem) -> Vec<vfs::DirEntry> {
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
+
+        let mut buf = Vec::with_capacity(count);
+        let mut skipped = 0;
+        let sectors = sb.data_sectors(self.start_id);
+        let mut read = 0;
+
+        let mut prev_sector = None;
+        for sid in sectors {
+            let dirents = sector::get(sid);
+            let dirents = dirents.lock();
+            let dirents: &[DirEntry] = dirents.as_slice();
+
+            for (i, dirent) in dirents
+                .iter()
+                .take_while(|dirent| unsafe { dirent.short.status() != DirEntryStatus::FreeHead })
+                .enumerate()
+            {
+                if read == count {
+                    return buf;
+                }
+
+                if unsafe {
+                    dirent.short.status() == DirEntryStatus::Occupied
+                        && dirent.attr() != LongDirEntry::attr()
+                        && !dirent.short.is_relative()
+                } {
+                    if skipped < at {
+                        skipped += 1;
+                        continue;
+                    }
+
+                    let checksum = unsafe { dirent.short.checksum() };
+                    let mut longs = Vec::with_capacity(10);
+
+                    let mut discrete = true;
+
+                    for dirent in dirents[..i].iter().rev().take_while(|dirent| unsafe {
+                        dirent.attr() == LongDirEntry::attr() && dirent.long.chksum == checksum
+                    }) {
+                        longs.push(unsafe { LongDirEntry::clone(&dirent.long) });
+                        if unsafe {
+                            dirent.long.ord & LongDirEntry::LAST_MASK == LongDirEntry::LAST_MASK
+                        } {
+                            discrete = false;
+                            break;
+                        }
+                    }
+
+                    if discrete {
+                        let prev = prev_sector.unwrap();
+                        sector::get(prev).lock().map_slice(|dirents: &[DirEntry]| {
+                            let end = dirents
+                                .iter()
+                                .rposition(|dirent| unsafe {
+                                    dirent.attr() == LongDirEntry::attr()
+                                        && dirent.long.chksum == checksum
+                                        && (dirent.long.ord & LongDirEntry::LAST_MASK
+                                            == LongDirEntry::LAST_MASK)
+                                })
+                                .expect("The last long entry was lost");
+                            longs.extend(
+                                dirents[end..]
+                                    .iter()
+                                    .rev()
+                                    .map(|dirent| unsafe { LongDirEntry::clone(&dirent.long) }),
+                            );
+                        });
+                    }
+
+                    let dname = dirents2name(&longs);
+                    buf.push(unsafe {
+                        vfs::DirEntry {
+                            inode: dirent.short.cluster_id().into(),
+                            ty: if dirent.attr().contains(AttrFlag::Directory) {
+                                DirEntryType::Directory
+                            } else {
+                                DirEntryType::Regular
+                            },
+                            name: dname,
+                        }
+                    });
+                    read += 1;
+                }
+            }
+
+            prev_sector = Some(sid);
+        }
+
+        buf
     }
 }
 
@@ -201,7 +296,7 @@ impl Inode {
             return Some(Self {
                 start_id,
                 dirent_pos,
-                kind: InodeKind::Directory,
+                ty: DirEntryType::Directory,
             });
         }
 
@@ -281,10 +376,10 @@ impl Inode {
         name: &str,
         sb: &mut FatFileSystem,
         gen_cid: fn(&Self, &mut ShortDirEntry, &mut FatFileSystem) -> ClusterId<u32>,
-    ) -> Option<(ClusterId<u32>, DirEntryPos)> {
+    ) -> Result<(ClusterId<u32>, DirEntryPos), vfs::Error> {
         if self.find_cwd(name, sb).is_some() {
             // TODO: 返回“文件已存在”的错误
-            return None;
+            return Err(vfs::Error::AlreadyExists);
         }
 
         let sector_dirents = sector_dirents();
@@ -368,7 +463,7 @@ impl Inode {
 
             start.access_mut(|dirent| *dirent = short);
 
-            return Some((cluster_id, start));
+            return Ok((cluster_id, start));
         }
 
         /* 尝试利用尾空槽 */
@@ -419,7 +514,7 @@ impl Inode {
 
             start.access_mut(|dirent| *dirent = short);
 
-            return Some((cluster_id, start));
+            return Ok((cluster_id, start));
         }
 
         /* 尝试分配新块 */
@@ -438,7 +533,7 @@ impl Inode {
                 dirents[n_long].short = short;
             });
 
-        Some((cluster_id, DirEntryPos::new(sectors.start, n_long)))
+        Ok((cluster_id, DirEntryPos::new(sectors.start, n_long)))
     }
 
     fn alloc_dir(&self, dir: &mut ShortDirEntry, sb: &mut FatFileSystem) -> ClusterId<u32> {
@@ -492,28 +587,16 @@ impl DirEntryPos {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InodeKind {
-    File,
-    Directory,
-}
-
-impl From<BitFlags<AttrFlag>> for InodeKind {
-    fn from(attr: BitFlags<AttrFlag>) -> Self {
-        if attr.contains(AttrFlag::Directory) {
-            Self::Directory
-        } else {
-            Self::File
-        }
-    }
-}
-
 impl From<(DirEntryPos, &ShortDirEntry)> for Inode {
     fn from((pos, dirent): (DirEntryPos, &ShortDirEntry)) -> Self {
         Self {
             start_id: dirent.cluster_id(),
             dirent_pos: pos,
-            kind: dirent.attr.into(),
+            ty: if dirent.attr.contains(AttrFlag::Directory) {
+                DirEntryType::Directory
+            } else {
+                DirEntryType::Regular
+            },
         }
     }
 }

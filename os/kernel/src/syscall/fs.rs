@@ -2,9 +2,8 @@
 
 use core::mem;
 
-use easy_fs::DirEntry;
 use enumflags2::BitFlags;
-use vfs::StatFs;
+use vfs::{CDirEntry, StatFs};
 
 use crate::fs;
 use crate::fs::PipeRingBuffer;
@@ -145,7 +144,7 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
 }
 
 // 若读取的对象不是目录，则会产生未定义行为
-pub fn sys_getdents(fd: usize, dents: *mut DirEntry, len: usize) -> isize {
+pub fn sys_getdents(fd: usize, dents: *mut CDirEntry, len: usize) -> isize {
     let process = processor::current_process();
     let process = process.inner().exclusive_access();
     let token = process.user_token();
@@ -165,19 +164,10 @@ pub fn sys_getdents(fd: usize, dents: *mut DirEntry, len: usize) -> isize {
     let dir = dir.clone();
     drop(process);
 
-    let read_byte_count = dir.read(UserBuffer::new(
-        token,
-        dents.cast(),
-        len * mem::size_of::<DirEntry>(),
-    ));
-
-    if read_byte_count % mem::size_of::<DirEntry>() != 0 {
-        // 读取的字节流没跟 DirEntry 对齐，
-        // 说明对象一定不是目录
-        return -1;
-    }
-
-    (read_byte_count / mem::size_of::<DirEntry>()) as isize
+    dir.getdents(
+        UserBuffer::new(token, dents.cast(), len * mem::size_of::<CDirEntry>()),
+        len,
+    ) as isize
 }
 
 pub fn sys_dup(fd: usize) -> isize {
@@ -209,13 +199,13 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
     let token = process.user_token();
     let mut path = UserBuffer::new(token, buf, len);
 
-    let cwd_len = process.cwd.path.len();
+    let cwd_len = process.cwd.len();
 
     if len < cwd_len {
         return -(cwd_len as isize);
     }
 
-    for (b, &cb) in path.iter_mut().zip(process.cwd.path.as_bytes()) {
+    for (b, &cb) in path.iter_mut().zip(process.cwd.as_bytes()) {
         *b = cb;
     }
 
