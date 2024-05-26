@@ -6,11 +6,7 @@ mod sync;
 mod thread;
 mod time;
 
-use easy_fs::DirEntry;
-use easy_fs::Stat;
-
 use self::{fs::*, graph::*, input::*, process::*, sync::*, thread::*, time::*};
-use crate::task::signal::SignalAction;
 
 const DUP: usize = 24;
 const UNLINKAT: usize = 35;

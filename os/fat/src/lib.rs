@@ -12,6 +12,6 @@ pub mod volume;
 pub use self::{
     cluster::{ClusterError, ClusterId},
     control::FatFileSystem,
-    inode::Inode,
+    inode::{Inode, ROOT},
     sector::SectorId,
 };

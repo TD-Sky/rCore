@@ -105,10 +105,6 @@ impl File for Pipe {
             }
         }
     }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
-    }
 }
 
 impl Pipe {

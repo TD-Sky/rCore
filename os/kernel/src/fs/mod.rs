@@ -21,16 +21,32 @@ pub mod stdio;
 
 use core::fmt::Debug;
 
-use easy_fs::Stat;
+use vfs::StatFs;
 
 pub use self::{directory::Directory, inode::*, pipe::*};
 use crate::memory::UserBuffer;
 
 /// 内存与存储设备之间的数据交换通道
 pub trait File: Debug + Send + Sync {
-    fn readable(&self) -> bool;
-    fn writable(&self) -> bool;
-    fn read(&self, buf: UserBuffer) -> usize;
-    fn write(&self, buf: UserBuffer) -> usize;
-    fn stat(&self) -> Stat;
+    fn readable(&self) -> bool {
+        false
+    }
+
+    fn writable(&self) -> bool {
+        false
+    }
+
+    #[allow(unused_variables)]
+    fn read(&self, buf: UserBuffer) -> usize {
+        0
+    }
+
+    #[allow(unused_variables)]
+    fn write(&self, buf: UserBuffer) -> usize {
+        0
+    }
+
+    fn stat(&self) -> StatFs {
+        StatFs::default()
+    }
 }

@@ -3,8 +3,9 @@ use core::cmp::Ordering;
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec;
-use easy_fs::{DirEntry, Stat};
+use easy_fs::DirEntry;
 use enumflags2::{bitflags, BitFlags};
+use vfs::StatFs;
 
 use crate::io::{read, write};
 use crate::status2option;
@@ -90,8 +91,8 @@ pub fn getcwd() -> String {
     String::from_utf8(buf).expect("Valid UTF-8 CWD")
 }
 
-pub fn fstat(fd: usize) -> Option<Stat> {
-    let mut stat = Stat::default();
+pub fn fstat(fd: usize) -> Option<StatFs> {
+    let mut stat = StatFs::default();
     sys_fstat(fd, &mut stat).eq(&0).then_some(stat)
 }
 

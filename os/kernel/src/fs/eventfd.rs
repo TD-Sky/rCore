@@ -114,10 +114,6 @@ impl File for EventFdContext {
             }
         }
     }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
-    }
 }
 
 impl File for NonBlockEventFdContext {
@@ -166,10 +162,6 @@ impl File for NonBlockEventFdContext {
         } else {
             usize::MAX
         }
-    }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
     }
 }
 
@@ -220,10 +212,6 @@ impl File for SemEventFdContext {
 
         0
     }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
-    }
 }
 
 impl File for SemNonBlockEventFdContext {
@@ -262,10 +250,6 @@ impl File for SemNonBlockEventFdContext {
     fn write(&self, _buf: UserBuffer) -> usize {
         self.count.fetch_add(1, atomic::Ordering::Release);
         0
-    }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
     }
 }
 

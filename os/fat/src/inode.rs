@@ -10,6 +10,12 @@ use crate::volume::data::{
 use crate::volume::reserved::bpb;
 use crate::{sector, ClusterId, FatFileSystem, SectorId};
 
+pub static ROOT: Inode = Inode {
+    start_id: ClusterId::MIN,
+    dirent_pos: DirEntryPos::ROOT,
+    kind: InodeKind::Directory,
+};
+
 /// 目录项会指向一个簇链表，这就是FAT文件系统中的inode。
 ///
 /// 理论上每个[`Inode`]是唯一的、目录项无关的，但为了实用，
@@ -22,12 +28,6 @@ pub struct Inode {
 }
 
 impl Inode {
-    pub const ROOT: Self = Self {
-        start_id: ClusterId::MIN,
-        dirent_pos: DirEntryPos::ROOT,
-        kind: InodeKind::Directory,
-    };
-
     /// 目录
     ///
     /// # 参数
