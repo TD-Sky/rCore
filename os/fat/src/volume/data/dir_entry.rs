@@ -111,8 +111,8 @@ impl ShortDirEntry {
 
     pub fn checksum_from<'a>(bytes: impl IntoIterator<Item = &'a u8>) -> u8 {
         let mut arr = [0; 11];
-        for (a, &b) in arr.iter_mut().zip(bytes) {
-            *a = b;
+        for (a, b) in arr.iter_mut().zip(bytes) {
+            *a = b.to_ascii_uppercase();
         }
         log::trace!("Input bytes: {arr:?}");
         let checksum = arr.iter().fold(0, |sum, &b| {

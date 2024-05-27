@@ -41,11 +41,10 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
             .init(HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
     }
 
+    let argv = argv as *const usize;
     let argv: Vec<_> = (0..argc)
         .map(|i| {
-            let ptr = unsafe {
-                ((argv + i * core::mem::size_of::<usize>()) as *const usize).read_volatile()
-            } as *const u8;
+            let ptr = unsafe { argv.add(i).read_volatile() } as *const u8;
             let len = (0..)
                 .find(|&i| unsafe { ptr.add(i).read_volatile() == b'\0' })
                 .unwrap();

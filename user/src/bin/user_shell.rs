@@ -229,8 +229,7 @@ fn sub_process(i: usize, process_args: &ProcessArgs, pipes: &[Pipe], end: usize)
         close(pipe[1]).unwrap();
     }
 
-    let (cmd, args) = process_args.args.split_first().unwrap();
-    if exec(cmd, args).is_none() {
+    if exec(&process_args.args[0], &process_args.args).is_none() {
         println!("Error when executing!");
         return Err(-4);
     }

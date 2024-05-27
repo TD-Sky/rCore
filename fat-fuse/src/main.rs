@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use block_dev::BlockDevice;
 use clap::Parser;
-use fat::{FatFileSystem, Inode};
+use fat::{FatFileSystem, ROOT};
 use typed_bytesize::ByteSizeIec;
 
 pub use self::{block_file::BlockFile, cli::Cli};
@@ -31,8 +31,7 @@ fn main() -> io::Result<()> {
     let mut fs = FatFileSystem::new(disk_size as usize);
     fs.foramt(&block_dev);
 
-    let root = Inode::ROOT;
-    let usr_bin = root
+    let usr_bin = ROOT
         .mkdir("usr", &mut fs)
         .and_then(|usr| usr.mkdir("bin", &mut fs))
         .unwrap();

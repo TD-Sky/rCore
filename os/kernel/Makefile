@@ -3,7 +3,8 @@ ROOT := $(abspath ../..)
 TARGET := riscv64gc-unknown-none-elf
 MODE := release
 KERNEL_ELF := $(ROOT)/os/target/$(TARGET)/$(MODE)/kernel
-FS_IMG := $(ROOT)/easy-fs-fuse/target/fs.img
+FS_FUSE := fat-fuse
+FS_IMG := $(ROOT)/$(FS_FUSE)/target/fs.img
 
 ifeq ($(MODE), release)
 	MODE_ARG := --release
@@ -66,10 +67,8 @@ kernel:
 
 fs-img:
 	@rm -rf $(FS_IMG)
-	@cd $(ROOT)/easy-fs-fuse && \
-		cargo run -r \
-			--bin easy-fs-packer \
-			-- \
+	@cd $(ROOT)/$(FS_FUSE) && \
+		cargo run -r -- \
 			-s $(ROOT)/user/src/bin \
 			-t $(ROOT)/user/target/riscv64gc-unknown-none-elf/release \
 			-O ./target
@@ -77,6 +76,6 @@ fs-img:
 clean:
 	@cargo clean
 	@cd $(ROOT)/user && cargo clean
-	@cd $(ROOT)/easy-fs-fuse && cargo clean
+	@cd $(ROOT)/$(FS_FUSE) && cargo clean
 
 .PHONY: build kernel clean run gdb-server gdb-client fs-img
