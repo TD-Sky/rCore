@@ -20,6 +20,12 @@ impl Sub for ClusterId<u32> {
     }
 }
 
+impl core::fmt::Display for ClusterId<u32> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#x}", self.0)
+    }
+}
+
 impl From<u32> for ClusterId<u32> {
     fn from(raw: u32) -> Self {
         Self(raw & 0x0FFF_FFFF)

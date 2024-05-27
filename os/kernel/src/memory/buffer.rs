@@ -63,14 +63,15 @@ impl UserBuffer {
     /// 将底层的数据作为独立的数组读出，
     /// 主要用于[`UserBuffer`]包含堆指针的情况。
     pub fn transmute_slice<T>(&self) -> Vec<T> {
-        let size = mem::size_of::<T>();
+        let end_offset = mem::size_of::<T>() - 1; // inclusive
 
         let mut i = 0;
         let mut value: MaybeUninit<T> = MaybeUninit::zeroed();
 
         self.iter().fold(Vec::new(), |mut acc, &b| {
             value.as_bytes_mut()[i].write(b);
-            if i == size {
+
+            if i == end_offset {
                 let value = mem::replace(&mut value, MaybeUninit::zeroed());
                 unsafe {
                     acc.push(value.assume_init());
@@ -79,6 +80,7 @@ impl UserBuffer {
             } else {
                 i += 1;
             }
+
             acc
         })
     }

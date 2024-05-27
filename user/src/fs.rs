@@ -1,12 +1,11 @@
-use core::cmp::Ordering;
-use core::mem::MaybeUninit;
-
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec;
-use easy_fs::DirEntry;
+use core::cmp::Ordering;
+use core::mem::MaybeUninit;
+
 use enumflags2::{bitflags, BitFlags};
-use vfs::Stat;
+use vfs::{CDirEntry, Stat};
 
 use crate::io::{read, write};
 use crate::status2option;
@@ -101,7 +100,7 @@ pub fn fstat(fd: usize) -> Option<Stat> {
     }
 }
 
-pub fn getdents(fd: usize, dents: &mut [DirEntry]) -> Option<usize> {
+pub fn getdents(fd: usize, dents: &mut [CDirEntry]) -> Option<usize> {
     status2option(sys_getdents(fd, dents))
 }
 

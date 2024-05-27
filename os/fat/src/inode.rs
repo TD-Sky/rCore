@@ -41,6 +41,7 @@ impl Inode {
         for cmp in cmps {
             let cmp_inode = inode.find_cwd(cmp, sb)?;
             if cmp_inode.ty != DirEntryType::Directory {
+                log::error!("Middle segment isn't directory");
                 return None;
             }
             inode = cmp_inode;
@@ -217,6 +218,10 @@ impl Inode {
                     }
 
                     let checksum = unsafe { dirent.short.checksum() };
+                    log::debug!(
+                        "parent={} pos=({sid}, {i}) checksum={checksum:#x}",
+                        self.start_id
+                    );
                     let mut longs = Vec::with_capacity(10);
 
                     let mut discrete = true;
@@ -296,6 +301,7 @@ impl Inode {
         }
 
         let checksum = ShortDirEntry::checksum_from(name.as_bytes());
+        log::debug!("Checksum of {name}: {checksum:#x}");
         let mut sectors = sb.data_sectors(self.start_id);
 
         if name == ".." {
@@ -552,11 +558,7 @@ impl Inode {
         sector::get(sectors.start)
             .lock()
             .map_mut_slice(|dirents: &mut [ShortDirEntry]| {
-                let mut cwd = *dir;
-                cwd.name.fill(0);
-                cwd.name[0] = b'.';
-
-                dirents[0] = cwd;
+                dirents[0] = dir.as_cwd();
                 dirents[1] = ShortDirEntry::new_parent(self.start_id);
             });
         ncid

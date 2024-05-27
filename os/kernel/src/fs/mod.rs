@@ -20,7 +20,7 @@ pub mod stdio;
 
 use core::fmt::Debug;
 
-use vfs::Stat;
+use vfs::{DirEntryType, Stat};
 
 pub use self::{inode::*, pipe::*};
 use crate::memory::UserBuffer;
@@ -46,7 +46,12 @@ pub trait File: Debug + Send + Sync {
     }
 
     fn stat(&self) -> Stat {
-        Stat::default()
+        Stat {
+            mode: DirEntryType::Regular,
+            block_size: 0,
+            blocks: 0,
+            size: 0,
+        }
     }
 
     #[allow(unused_variables)]

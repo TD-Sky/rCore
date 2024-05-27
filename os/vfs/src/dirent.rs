@@ -1,5 +1,4 @@
 use alloc::string::String;
-use core::ffi::c_char;
 
 #[derive(Debug)]
 pub struct DirEntry {
@@ -16,7 +15,10 @@ pub struct CDirEntry {
     /// Inode number
     pub inode: u64,
     pub ty: DirEntryType,
-    pub name: *mut c_char,
+    /// NULL结尾字符串，
+    /// 最长为[`CDirEntry::NAME_CAP`]，
+    /// 分配容量为最大长度+1
+    pub name: *mut u8,
 }
 
 impl CDirEntry {

@@ -63,7 +63,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let token = processor::current_user_token();
     let path = memory::read_str(token, path);
 
-    let Some(inode) = fs::open_file(&path, BitFlags::from_bits(flags).unwrap()) else {
+    let Some(inode) = fs::open(&path, BitFlags::from_bits(flags).unwrap()) else {
         return -1;
     };
 

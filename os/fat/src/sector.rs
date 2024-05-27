@@ -89,6 +89,12 @@ impl Step for SectorId {
     }
 }
 
+impl core::fmt::Display for SectorId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl SectorId {
     pub const fn new(raw: usize) -> Self {
         Self(raw)

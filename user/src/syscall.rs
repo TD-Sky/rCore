@@ -1,8 +1,7 @@
 use core::arch::asm;
 use core::ffi::{c_char, CStr};
 
-use easy_fs::DirEntry;
-use vfs::Stat;
+use vfs::{CDirEntry, Stat};
 
 use crate::signal::SignalAction;
 
@@ -90,7 +89,7 @@ pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
 ///
 /// UB
 /// 若读取的不是目录，则可能发生未定义行为
-pub fn sys_getdents(fd: usize, dents: &mut [DirEntry]) -> isize {
+pub fn sys_getdents(fd: usize, dents: &mut [CDirEntry]) -> isize {
     syscall(GETDENTS, [fd, dents.as_mut_ptr() as usize, dents.len()])
 }
 

@@ -12,6 +12,19 @@ use enumflags2::{bitflags, BitFlags};
 
 use crate::{volume::reserved::bpb, ClusterId};
 
+static CWD_NAME: [u8; 11] = {
+    let mut arr = [0; 11];
+    arr[0] = b'.';
+    arr
+};
+
+static PARENT_NAME: [u8; 11] = {
+    let mut arr = [0; 11];
+    arr[0] = b'.';
+    arr[1] = b'.';
+    arr
+};
+
 /// 这是一个极度危险的类型，只应该在搜索目录项时使用。
 ///
 /// 出于方便考虑，两个目录项都实现`Copy`，当C语言写吧。
@@ -32,7 +45,7 @@ impl DirEntry {
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(packed)]
 pub struct ShortDirEntry {
-    pub name: [u8; 11],
+    name: [u8; 11],
 
     pub attr: BitFlags<AttrFlag>,
 
@@ -72,6 +85,12 @@ pub struct ShortDirEntry {
 }
 
 impl ShortDirEntry {
+    pub fn as_cwd(&self) -> Self {
+        let mut cwd = *self;
+        cwd.name = CWD_NAME;
+        cwd
+    }
+
     /// 创建一个簇编号为`pid`的父目录项(..)
     pub fn new_parent(mut pid: ClusterId<u32>) -> Self {
         let mut dirent = Self::default();
@@ -83,7 +102,7 @@ impl ShortDirEntry {
         dirent.set_cluster_id(pid);
 
         dirent.attr |= AttrFlag::Directory;
-        dirent.name[..2].copy_from_slice(b"..");
+        dirent.name = PARENT_NAME;
         dirent
     }
 
@@ -160,7 +179,7 @@ impl ShortDirEntry {
     }
 
     pub fn is_relative(&self) -> bool {
-        self.name == *b".          " || self.name == *b"..         "
+        self.name == CWD_NAME || self.name == PARENT_NAME
     }
 }
 

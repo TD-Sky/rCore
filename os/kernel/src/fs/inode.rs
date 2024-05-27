@@ -122,6 +122,7 @@ impl File for OSInode {
         let mut inner = self.inner.exclusive_access();
         let dirents = inner.inode.ls_at(inner.offset, len, &FS.exclusive_access());
         let read = dirents.len();
+        log::debug!("Read DirEntries: {read}");
 
         let name_ptrs: Vec<_> = buf
             .transmute_slice::<CDirEntry>()
@@ -131,7 +132,7 @@ impl File for OSInode {
             .collect();
 
         for (&name_ptr, dirent) in name_ptrs.iter().zip(&dirents) {
-            let mut name_buf = UserBuffer::new(buf.token(), name_ptr.cast(), CDirEntry::NAME_CAP);
+            let mut name_buf = UserBuffer::new(buf.token(), name_ptr, CDirEntry::NAME_CAP);
             for (cnb, &dnb) in name_buf.iter_mut().zip(dirent.name.as_bytes()) {
                 *cnb = dnb;
             }
@@ -188,7 +189,7 @@ impl OpenFlag {
     }
 }
 
-pub fn open_file(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
+pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
     let [readable, writable] = if flags.is_empty() {
         [true, false]
     } else if flags.contains(OpenFlag::WRONLY) {
@@ -200,6 +201,10 @@ pub fn open_file(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> 
 
     let mut fs = FS.exclusive_access();
     let relat_path = path.trim_start_matches('/');
+
+    if relat_path.is_empty() {
+        return Some(Arc::new(OSInode::new(readable, writable, ROOT.clone())));
+    }
 
     ROOT.find(relat_path, &fs)
         .map(|mut inode| {
