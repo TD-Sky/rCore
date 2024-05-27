@@ -23,7 +23,7 @@ impl CDirEntry {
     pub const NAME_CAP: usize = 255;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum DirEntryType {
     Block,
@@ -31,5 +31,6 @@ pub enum DirEntryType {
     Directory,
     Fifo,
     SymLink,
+    #[default]
     Regular,
 }

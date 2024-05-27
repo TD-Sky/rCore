@@ -1,9 +1,8 @@
 use core::arch::asm;
 use core::ffi::{c_char, CStr};
-use core::ptr;
 
 use easy_fs::DirEntry;
-use vfs::StatFs;
+use vfs::Stat;
 
 use crate::signal::SignalAction;
 
@@ -183,8 +182,8 @@ pub fn sys_getcwd(buf: &mut [u8], len: usize) -> isize {
     syscall(GETCWD, [buf.as_mut_ptr() as usize, len, 0])
 }
 
-pub fn sys_fstat(fd: usize, st: &mut StatFs) -> isize {
-    syscall(FSTAT, [fd, ptr::from_mut(st) as usize, 0])
+pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
+    syscall(FSTAT, [fd, st as usize, 0])
 }
 
 /// 将进程中一个已经打开的文件复制一份并分配到一个新的文件描述符中

@@ -11,7 +11,7 @@ use fat::Inode;
 use fat::ROOT;
 use spin::Lazy;
 use vfs::CDirEntry;
-use vfs::StatFs;
+use vfs::Stat;
 
 use super::File;
 use crate::drivers::BLOCK_DEVICE;
@@ -111,8 +111,11 @@ impl File for OSInode {
         total_write_size
     }
 
-    fn stat(&self) -> StatFs {
-        FS.exclusive_access().statfs()
+    fn stat(&self) -> Stat {
+        self.inner
+            .exclusive_access()
+            .inode
+            .stat(&FS.exclusive_access())
     }
 
     fn getdents(&self, mut buf: UserBuffer, len: usize) -> usize {

@@ -1,11 +1,12 @@
 use core::cmp::Ordering;
+use core::mem::MaybeUninit;
 
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec;
 use easy_fs::DirEntry;
 use enumflags2::{bitflags, BitFlags};
-use vfs::StatFs;
+use vfs::Stat;
 
 use crate::io::{read, write};
 use crate::status2option;
@@ -91,9 +92,13 @@ pub fn getcwd() -> String {
     String::from_utf8(buf).expect("Valid UTF-8 CWD")
 }
 
-pub fn fstat(fd: usize) -> Option<StatFs> {
-    let mut stat = StatFs::default();
-    sys_fstat(fd, &mut stat).eq(&0).then_some(stat)
+pub fn fstat(fd: usize) -> Option<Stat> {
+    let mut stat = MaybeUninit::zeroed();
+    unsafe {
+        sys_fstat(fd, stat.as_mut_ptr())
+            .eq(&0)
+            .then_some(stat.assume_init())
+    }
 }
 
 pub fn getdents(fd: usize, dents: &mut [DirEntry]) -> Option<usize> {

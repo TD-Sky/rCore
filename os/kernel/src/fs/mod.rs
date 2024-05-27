@@ -20,7 +20,7 @@ pub mod stdio;
 
 use core::fmt::Debug;
 
-use vfs::StatFs;
+use vfs::Stat;
 
 pub use self::{inode::*, pipe::*};
 use crate::memory::UserBuffer;
@@ -45,8 +45,8 @@ pub trait File: Debug + Send + Sync {
         0
     }
 
-    fn stat(&self) -> StatFs {
-        StatFs::default()
+    fn stat(&self) -> Stat {
+        Stat::default()
     }
 
     #[allow(unused_variables)]

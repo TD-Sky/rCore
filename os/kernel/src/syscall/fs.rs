@@ -3,7 +3,7 @@
 use core::mem;
 
 use enumflags2::BitFlags;
-use vfs::{CDirEntry, StatFs};
+use vfs::{CDirEntry, Stat};
 
 use crate::fs;
 use crate::fs::PipeRingBuffer;
@@ -107,7 +107,7 @@ pub fn sys_unlinkat(path: *const u8) -> isize {
     }
 }
 
-pub fn sys_fstat(fd: usize, st: *mut StatFs) -> isize {
+pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     let process = processor::current_process();
     let inner = process.inner().exclusive_access();
     let fd_table = &inner.fd_table;

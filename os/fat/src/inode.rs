@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::mem;
-use vfs::DirEntryType;
+use vfs::{DirEntryType, Stat};
 
 use crate::volume::data::{
     dirents2name, name2dirents, sector_dirents, AttrFlag, DirEntry, DirEntryStatus, LongDirEntry,
@@ -274,6 +274,15 @@ impl Inode {
         }
 
         buf
+    }
+
+    pub fn stat(&self, sb: &FatFileSystem) -> Stat {
+        Stat {
+            mode: self.ty,
+            block_size: bpb().sector_bytes() as u64,
+            blocks: sb.data_sectors(self.start_id).count() as u64,
+            size: self.dirent_pos.access(ShortDirEntry::file_size) as u64,
+        }
     }
 }
 

@@ -9,5 +9,5 @@ mod stat;
 pub use self::{
     dirent::{CDirEntry, DirEntry, DirEntryType},
     error::Error,
-    stat::StatFs,
+    stat::Stat,
 };
