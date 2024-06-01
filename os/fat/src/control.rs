@@ -1,4 +1,5 @@
-use alloc::sync::Arc;
+use alloc::vec::Vec;
+use alloc::{sync::Arc, vec};
 use core::iter::Iterator;
 use core::mem;
 use core::ops::Range;
@@ -116,6 +117,10 @@ impl FatFileSystem {
         }
         .flatten()
     }
+
+    pub fn data_sector_cursor(&self, start_cluster: ClusterId<u32>) -> SectorCursor {
+        SectorCursor::new(start_cluster, self)
+    }
 }
 
 #[derive(Debug)]
@@ -132,5 +137,116 @@ impl Iterator for DataSectors<'_> {
         let sectors = self.control.data_area.cluster(id).unwrap();
         self.id = self.control.fat_area.next(id).unwrap();
         Some(sectors)
+    }
+}
+
+#[derive(Debug)]
+pub struct SectorCursor<'a> {
+    current: (usize, Range<SectorId>, usize, SectorId),
+    clusters: Vec<ClusterId>,
+    control: &'a FatFileSystem,
+}
+
+impl<'a> SectorCursor<'a> {
+    pub fn new(start_cluster: ClusterId<u32>, control: &'a FatFileSystem) -> Self {
+        let sids = control.data_area.cluster(start_cluster).unwrap();
+        let start_sector = sids.start;
+
+        Self {
+            current: (0, sids, 0, start_sector),
+            clusters: vec![start_cluster],
+            control,
+        }
+    }
+
+    pub fn sector(&self) -> SectorId {
+        self.current.3
+    }
+
+    /// 向后搜寻目标扇区，移动。若搜寻无果则返回`None`，游标停留在最后一个扇区。
+    pub fn find(&mut self, sector: SectorId) -> Option<&mut Self> {
+        let mut cur = self;
+        loop {
+            if cur.sector() == sector {
+                return Some(cur);
+            }
+            cur = cur.next()?;
+        }
+    }
+
+    /// 前向搜寻目标扇区，移动。若搜寻无果则返回`None`，游标停留在第一个扇区。
+    pub fn rfind(&mut self, sector: SectorId) -> Option<&mut Self> {
+        let mut cur = self;
+        loop {
+            if cur.sector() == sector {
+                return Some(cur);
+            }
+            cur = cur.prev()?;
+        }
+    }
+
+    /// 移动到上一个扇区，没有时返回`None`且状态不变。
+    pub fn prev(&mut self) -> Option<&mut Self> {
+        let (cindex, sids, sindex, sid) = &mut self.current;
+
+        if let Some(prev_si) = sindex.checked_sub(1) {
+            // 簇不变，扇区前移
+
+            *sindex = prev_si;
+            *sid = sids.clone().nth(prev_si).expect("nth has been checked");
+
+            Some(self)
+        } else if let Some(prev_ci) = cindex.checked_sub(1) {
+            // 簇前移，扇区变为上一个簇的末扇区
+
+            *cindex = prev_ci;
+            *sids = self
+                .control
+                .data_area
+                .cluster(self.clusters[prev_ci])
+                .unwrap();
+            *sindex = bpb().cluster_sectors() - 1;
+            *sid = sids.clone().nth(*sindex).expect("nth has been checked");
+
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    /// 移动到下一个扇区，没有时返回`None`且状态不变。。
+    pub fn next(&mut self) -> Option<&mut Self> {
+        let (cindex, sids, sindex, sid) = &mut self.current;
+
+        if let Some(next_sid) = sids.clone().nth(*sindex + 1) {
+            // 簇不变，扇区后移
+            *sindex += 1;
+            *sid = next_sid;
+
+            Some(self)
+        } else {
+            // 簇后移，扇区变为下一个簇的头扇区
+            let next_ci = *cindex + 1;
+
+            let next_cid = match self.clusters.get(next_ci) {
+                Some(&next_cid) => next_cid,
+                None => {
+                    let next_cid = self
+                        .control
+                        .fat_area
+                        .next(self.clusters[*cindex])
+                        .unwrap()?;
+                    self.clusters.push(next_cid);
+                    next_cid
+                }
+            };
+
+            *cindex = next_ci;
+            *sids = self.control.data_area.cluster(next_cid).unwrap();
+            *sindex = 0;
+            *sid = sids.start;
+
+            Some(self)
+        }
     }
 }

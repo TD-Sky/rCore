@@ -25,6 +25,16 @@ static PARENT_NAME: [u8; 11] = {
     arr
 };
 
+pub type FreeDirEntry = [u8; 32];
+
+pub static FREE: FreeDirEntry = {
+    let mut arr = [0; 32];
+    arr[0] = 0xE5;
+    arr
+};
+
+pub static TAIL_FREE: FreeDirEntry = [0; 32];
+
 /// 这是一个极度危险的类型，只应该在搜索目录项时使用。
 ///
 /// 出于方便考虑，两个目录项都实现`Copy`，当C语言写吧。
@@ -165,21 +175,31 @@ impl ShortDirEntry {
     pub fn status(&self) -> DirEntryStatus {
         match self.name[0] {
             0xE5 => DirEntryStatus::Free,
-            0x00 => DirEntryStatus::FreeHead,
+            0x00 => DirEntryStatus::TailFree,
             _ => DirEntryStatus::Occupied,
         }
     }
 
-    pub const fn file_size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.file_size as usize
     }
 
-    pub fn set_file_size(&mut self, size: usize) {
+    pub fn resize(&mut self, size: usize) {
         self.file_size = size as u32;
     }
 
     pub fn is_relative(&self) -> bool {
         self.name == CWD_NAME || self.name == PARENT_NAME
+    }
+}
+
+impl ShortDirEntry {
+    fn rename(&mut self, name: &str) {
+        let mut arr = [0; 11];
+        for (b, nb) in arr.iter_mut().zip(name.as_bytes()) {
+            *b = nb.to_ascii_uppercase();
+        }
+        self.name = arr;
     }
 }
 
@@ -223,15 +243,13 @@ impl Default for LongDirEntry {
 impl LongDirEntry {
     pub const LAST_MASK: u8 = 0b0100_0000;
 
+    /// 可为名称容纳的字节数
+    pub const CAP: usize = 26;
+
     #[inline]
     pub fn attr() -> BitFlags<AttrFlag> {
         AttrFlag::ReadOnly | AttrFlag::Hidden | AttrFlag::System | AttrFlag::VolumeID
     }
-}
-
-impl LongDirEntry {
-    /// 可为名称容纳的字节数
-    const CAP: usize = 26;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -253,8 +271,8 @@ pub enum AttrFlag {
 pub enum DirEntryStatus {
     /// name[0] == 0xE5
     Free,
-    /// name[0] == 0，是接下来连续空条目之首
-    FreeHead,
+    /// name[0] == 0，此条目后的条目皆为[`DirEntryStatus::TailFree`]
+    TailFree,
     /// 已被使用
     Occupied,
 }
@@ -284,9 +302,7 @@ pub fn dirents2name(dirents: &[LongDirEntry]) -> String {
 /// - `Vec<LongDirEntry>`: **反序排列**的长目录项，已全数赋值。
 pub fn name2dirents(name: &str) -> (ShortDirEntry, Vec<LongDirEntry>) {
     let mut short = ShortDirEntry::default();
-    for (b, nb) in short.name.iter_mut().zip(name.as_bytes()) {
-        *b = nb.to_ascii_uppercase();
-    }
+    short.rename(name);
 
     let chksum = short.checksum();
 
@@ -315,6 +331,42 @@ pub fn name2dirents(name: &str) -> (ShortDirEntry, Vec<LongDirEntry>) {
     longs[0].ord |= LongDirEntry::LAST_MASK;
 
     (short, longs)
+}
+
+/// 修改短目录的名称，并构造新的长目录项。
+///
+/// # 返回
+///
+/// - `Vec<LongDirEntry>`: **反序排列**的长目录项，已全数赋值。
+pub fn rename_dirents(short: &mut ShortDirEntry, new_name: &str) -> Vec<LongDirEntry> {
+    short.rename(new_name);
+    let chksum = short.checksum();
+
+    let mut longs: Vec<_> = new_name
+        .as_bytes()
+        .chunks(LongDirEntry::CAP)
+        .enumerate()
+        .map(|(i, bytes)| {
+            let mut long = LongDirEntry {
+                ord: (i + 1) as u8,
+                chksum,
+                ..Default::default()
+            };
+            for (b, &nb) in [long.name1.as_mut_slice(), &mut long.name2, &mut long.name3]
+                .into_iter()
+                .flatten()
+                .zip(bytes)
+            {
+                *b = nb;
+            }
+            long
+        })
+        .rev()
+        .collect();
+
+    longs[0].ord |= LongDirEntry::LAST_MASK;
+
+    longs
 }
 
 pub fn sector_dirents() -> usize {

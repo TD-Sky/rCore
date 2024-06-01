@@ -22,6 +22,7 @@ mod fs;
 mod lang_items;
 mod logging;
 mod memory;
+mod path;
 mod ptr;
 mod sbi;
 mod stack_trace;

@@ -19,6 +19,7 @@ const READ: usize = 63;
 const WRITE: usize = 64;
 const GETCWD: usize = 79;
 const FSTAT: usize = 80;
+const RENAME: usize = 82;
 const EXIT: usize = 93;
 const SLEEP: usize = 101;
 const YIELD: usize = 124;
@@ -66,6 +67,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         WRITE => sys_write(args[0], args[1] as _, args[2]),
         GETCWD => sys_getcwd(args[0] as _, args[1]),
         FSTAT => sys_fstat(args[0], args[1] as _),
+        RENAME => sys_rename(args[0] as _, args[1] as _),
         EXIT => sys_exit(args[0] as i32),
         SLEEP => sys_sleep(args[0]),
         YIELD => sys_yield(),

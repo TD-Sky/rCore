@@ -16,6 +16,7 @@ use vfs::Stat;
 use super::File;
 use crate::drivers::BLOCK_DEVICE;
 use crate::memory::UserBuffer;
+use crate::path::Path;
 use crate::sync::UpCell;
 
 static FS: Lazy<UpCell<FatFileSystem>> =
@@ -218,9 +219,9 @@ pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
                 .then(|| {
                     if let Some((parent, fname)) = relat_path.rsplit_once('/') {
                         let parent = ROOT.find(parent, &fs)?;
-                        parent.touch(fname, &mut fs)
+                        parent.create_file(fname, &mut fs)
                     } else {
-                        ROOT.touch(relat_path, &mut fs)
+                        ROOT.create_file(relat_path, &mut fs)
                     }
                     .ok()
                     .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
@@ -239,4 +240,41 @@ pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
 #[inline]
 pub fn unlink_at(path: &str) -> Option<()> {
     None
+}
+
+/// # 参数
+///
+/// `old_path`和`new_path`都是标准路径。
+pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
+    // let fs = FS.exclusive_access();
+    //
+    // if new_path.starts_with(old_path) {
+    //     // 倒反天罡: /foo/bar -> /foo/bar/zoo
+    //     return None;
+    // }
+    //
+    // let old_parent = old_path.parent()?;
+    // let new_parent = new_path.parent();
+    //
+    // if old_parent == new_path {
+    //     // 原地命名，跳过
+    //     return None;
+    // }
+    //
+    // if Some(old_parent) == new_parent {
+    //     // 同一目录下的重命名
+    //     let old_name = old_path
+    //         .file_name()
+    //         .expect("it has parent, should has file name");
+    //     let new_name = new_path.file_name();
+    //     let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
+    // }
+    //
+    // let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
+    // let new_parent = match new_path.parent().and_then(|p| p.root_relative()) {
+    //     Some(parent) => &ROOT.find(parent, &fs)?,
+    //     None => &ROOT,
+    // };
+
+    todo!()
 }

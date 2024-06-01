@@ -129,6 +129,14 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     }
 }
 
+pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> isize {
+    let token = processor::current_user_token();
+    let oldpath = memory::read_str(token, oldpath);
+    let newpath = memory::read_str(token, newpath);
+
+    todo!()
+}
+
 pub fn sys_pipe(pipe: *mut usize) -> isize {
     let process = processor::current_process();
     let mut process = process.inner().exclusive_access();
