@@ -8,7 +8,6 @@ use enumflags2::{bitflags, BitFlags};
 use vfs::{CDirEntry, Stat};
 
 use crate::io::{read, write};
-use crate::status2option;
 use crate::syscall::*;
 
 #[bitflags]
@@ -47,30 +46,30 @@ pub enum EventFdFlag {
 
 pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<usize> {
     let path = CString::new(path).unwrap();
-    status2option(sys_open(&path, flags.bits()))
+    sys_open(&path, flags.bits()).status()
 }
 
 pub fn close(fd: usize) -> Option<()> {
-    sys_close(fd).eq(&0).then_some(())
+    sys_close(fd).some()
 }
 
 pub fn pipe(pipe_fd: &mut [usize]) -> Option<()> {
-    sys_pipe(pipe_fd).eq(&0).then_some(())
+    sys_pipe(pipe_fd).some()
 }
 
 pub fn dup(fd: usize) -> Option<usize> {
-    status2option(sys_dup(fd))
+    sys_dup(fd).status()
 }
 
 pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
     let old_path = CString::new(old_path).unwrap();
     let new_path = CString::new(new_path).unwrap();
-    sys_linkat(&old_path, &new_path).eq(&0).then_some(())
+    sys_linkat(&old_path, &new_path).some()
 }
 
 pub fn remove(path: &str) -> Option<()> {
     let path = CString::new(path).unwrap();
-    sys_unlinkat(&path).eq(&0).then_some(())
+    sys_unlinkat(&path).some()
 }
 
 pub fn getcwd() -> String {
@@ -93,19 +92,21 @@ pub fn getcwd() -> String {
 
 pub fn fstat(fd: usize) -> Option<Stat> {
     let mut stat = MaybeUninit::zeroed();
-    unsafe {
-        sys_fstat(fd, stat.as_mut_ptr())
-            .eq(&0)
-            .then_some(stat.assume_init())
-    }
+    unsafe { sys_fstat(fd, stat.as_mut_ptr()).some() }
+}
+
+pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
+    let old_path = CString::new(old_path).ok()?;
+    let new_path = CString::new(new_path).ok()?;
+    sys_rename(&old_path, &new_path).some()
 }
 
 pub fn getdents(fd: usize, dents: &mut [CDirEntry]) -> Option<usize> {
-    status2option(sys_getdents(fd, dents))
+    sys_getdents(fd, dents).status()
 }
 
 pub fn eventfd(initval: u64, flags: BitFlags<EventFdFlag>) -> Option<usize> {
-    status2option(sys_eventfd(initval, flags.bits()))
+    sys_eventfd(initval, flags.bits()).status()
 }
 
 pub fn eventfd_read(fd: usize) -> Option<u64> {

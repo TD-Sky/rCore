@@ -1,7 +1,6 @@
 use core::ptr::NonNull;
 use core::slice;
 
-use crate::status2option;
 use crate::syscall::*;
 
 use enumflags2::{bitflags, BitFlags};
@@ -16,7 +15,9 @@ pub enum ProtectFlag {
 }
 
 pub fn sbrk(size: i32) -> Option<NonNull<u8>> {
-    status2option(sys_sbrk(size)).and_then(|old_brk| NonNull::new(old_brk as *mut u8))
+    sys_sbrk(size)
+        .status()
+        .and_then(|old_brk| NonNull::new(old_brk as *mut u8))
 }
 
 pub fn mmap(

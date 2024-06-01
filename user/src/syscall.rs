@@ -16,6 +16,7 @@ const READ: usize = 63;
 const WRITE: usize = 64;
 const GETCWD: usize = 79;
 const FSTAT: usize = 80;
+const RENAME: usize = 82;
 const EXIT: usize = 93;
 const SLEEP: usize = 101;
 const YIELD: usize = 124;
@@ -49,6 +50,21 @@ const FRAMEBUFFER: usize = 2000;
 const FRAMEBUFFER_FLUSH: usize = 2001;
 const GET_EVENT: usize = 3000;
 const KEY_PRESSED: usize = 3001;
+
+pub(crate) trait Status: Sized {
+    fn status(self) -> Option<usize>;
+    fn some(self) -> Option<()>;
+}
+
+impl Status for isize {
+    fn status(self) -> Option<usize> {
+        (self >= 0).then_some(self as usize)
+    }
+
+    fn some(self) -> Option<()> {
+        (self == 0).then_some(())
+    }
+}
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
@@ -183,6 +199,13 @@ pub fn sys_getcwd(buf: &mut [u8], len: usize) -> isize {
 
 pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     syscall(FSTAT, [fd, st as usize, 0])
+}
+
+pub fn sys_rename(oldpath: &CStr, newpath: &CStr) -> isize {
+    syscall(
+        RENAME,
+        [oldpath.as_ptr() as usize, newpath.as_ptr() as usize, 0],
+    )
 }
 
 /// 将进程中一个已经打开的文件复制一份并分配到一个新的文件描述符中

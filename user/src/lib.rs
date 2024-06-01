@@ -62,8 +62,3 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
 fn main(_argc: usize, _argv: &[&str]) -> i32 {
     panic!("Cannot find main!");
 }
-
-#[inline]
-fn status2option(status: isize) -> Option<usize> {
-    (status >= 0).then_some(status as usize)
-}

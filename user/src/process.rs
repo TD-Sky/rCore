@@ -3,7 +3,6 @@ use alloc::format;
 use alloc::vec::Vec;
 use core::ptr;
 
-use crate::status2option;
 use crate::syscall::*;
 use crate::thread::yield_;
 
@@ -43,8 +42,8 @@ where
 }
 
 pub fn spawn(path: &str) -> Option<usize> {
-    let path = CString::new(path).unwrap();
-    status2option(sys_spawn(&path))
+    let path = CString::new(path).ok()?;
+    sys_spawn(&path).status()
 }
 
 /// 等待任意一个子进程结束
