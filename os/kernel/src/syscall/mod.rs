@@ -8,9 +8,10 @@ mod time;
 
 use self::{fs::*, graph::*, input::*, process::*, sync::*, thread::*, time::*};
 
+const LINK: usize = 9;
+const UNLINK: usize = 10;
 const DUP: usize = 24;
-const UNLINKAT: usize = 35;
-const LINKAT: usize = 37;
+const RMDIR: usize = 40;
 const OPEN: usize = 56;
 const CLOSE: usize = 57;
 const PIPE: usize = 59;
@@ -56,9 +57,10 @@ const KEY_PRESSED: usize = 3001;
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
+        LINK => sys_link(args[0] as _, args[1] as _),
+        UNLINK => sys_unlink(args[0] as _),
         DUP => sys_dup(args[0]),
-        UNLINKAT => sys_unlinkat(args[0] as _),
-        LINKAT => sys_linkat(args[0] as _, args[1] as _),
+        RMDIR => sys_rmdir(args[0] as _),
         OPEN => sys_open(args[0] as _, args[1] as u32),
         CLOSE => sys_close(args[0]),
         PIPE => sys_pipe(args[0] as _),

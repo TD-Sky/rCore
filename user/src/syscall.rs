@@ -5,9 +5,10 @@ use vfs::{CDirEntry, Stat};
 
 use crate::signal::SignalAction;
 
+const LINK: usize = 9;
+const UNLINK: usize = 10;
 const DUP: usize = 24;
-const UNLINKAT: usize = 35;
-const LINKAT: usize = 37;
+const RMDIR: usize = 40;
 const OPEN: usize = 56;
 const CLOSE: usize = 57;
 const PIPE: usize = 59;
@@ -175,15 +176,19 @@ pub fn sys_spawn(path: &CStr) -> isize {
     syscall(SPAWN, [path.as_ptr() as usize, 0, 0])
 }
 
-pub fn sys_linkat(oldpath: &CStr, newpath: &CStr) -> isize {
+pub fn sys_link(oldpath: &CStr, newpath: &CStr) -> isize {
     syscall(
-        LINKAT,
+        LINK,
         [oldpath.as_ptr() as usize, newpath.as_ptr() as usize, 0],
     )
 }
 
-pub fn sys_unlinkat(path: &CStr) -> isize {
-    syscall(UNLINKAT, [path.as_ptr() as usize, 0, 0])
+pub fn sys_unlink(path: &CStr) -> isize {
+    syscall(UNLINK, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_rmdir(path: &CStr) -> isize {
+    syscall(RMDIR, [path.as_ptr() as usize, 0, 0])
 }
 
 /// 将当前进程所在目录的绝对路径写入缓冲区

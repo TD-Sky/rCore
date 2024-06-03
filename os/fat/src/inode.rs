@@ -297,6 +297,39 @@ impl Inode {
     }
 
     /// 目录
+    pub fn unlink(&mut self, name: &str, sb: &mut FatFileSystem) -> Result<(), vfs::Error> {
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
+
+        let inode = self.find_cwd(name, sb).ok_or(vfs::Error::NotFound)?;
+        if inode.ty == DirEntryType::Directory {
+            return Err(vfs::Error::IsADirectory);
+        }
+        sb.fat_mut().dealloc(inode.start_id).unwrap();
+        self.remove(inode.range, sb);
+
+        Ok(())
+    }
+
+    /// 目录
+    ///
+    /// 删除空目录。
+    pub fn rmdir(&mut self, name: &str, sb: &mut FatFileSystem) -> Result<(), vfs::Error> {
+        debug_assert_eq!(self.ty, DirEntryType::Directory);
+
+        let inode = self.find_cwd(name, sb).ok_or(vfs::Error::NotFound)?;
+        if inode.ty != DirEntryType::Directory {
+            return Err(vfs::Error::NotADirectory);
+        } else if !inode.is_empty_dir(sb) {
+            return Err(vfs::Error::DirectoryNotEmpty);
+        }
+
+        sb.fat_mut().dealloc(inode.start_id).unwrap();
+        self.remove(inode.range, sb);
+
+        Ok(())
+    }
+
+    /// 目录
     pub fn rename(
         &self,
         old_name: &str,
@@ -305,8 +338,8 @@ impl Inode {
     ) -> Result<(), vfs::Error> {
         debug_assert_eq!(self.ty, DirEntryType::Directory);
 
-        let mut dirent = self.find_cwd(old_name, sb).ok_or(vfs::Error::NotFound)?;
-        let new_longs = dirent
+        let mut inode = self.find_cwd(old_name, sb).ok_or(vfs::Error::NotFound)?;
+        let new_longs = inode
             .range
             .short
             .access_mut(|short| rename_dirents(short, new_name));
@@ -314,12 +347,12 @@ impl Inode {
         let n_old_long = old_name.len().div_ceil(LongDirEntry::CAP);
         match n_old_long.cmp(&new_longs.len()) {
             Ordering::Less => {
-                let short = dirent.range.short.get();
-                self.remove(dirent.range, sb);
+                let short = inode.range.short.get();
+                self.remove(inode.range, sb);
                 self.create(new_name, short, new_longs, sb)?;
             }
-            Ordering::Equal => dirent.range.write_longs(&new_longs),
-            Ordering::Greater => dirent.range.shrink_longs(n_old_long, &new_longs),
+            Ordering::Equal => inode.range.write_longs(&new_longs),
+            Ordering::Greater => inode.range.shrink_longs(n_old_long, &new_longs),
         }
 
         Ok(())
@@ -713,6 +746,19 @@ impl Inode {
                 }
             }
         }
+    }
+
+    fn is_empty_dir(&self, sb: &FatFileSystem) -> bool {
+        let mut sectors = sb.data_sectors(self.start_id);
+        let i = if self.start_id == ClusterId::MIN {
+            0
+        } else {
+            2
+        };
+        sector::get(sectors.next().unwrap()).lock().map(
+            i * mem::size_of::<ShortDirEntry>(),
+            |dirent: &ShortDirEntry| dirent.status() == DirEntryStatus::TailFree,
+        )
     }
 }
 

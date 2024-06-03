@@ -5,8 +5,7 @@ extern crate alloc;
 
 #[macro_use]
 extern crate user;
-use user::fs::{close, open, rename, OpenFlag};
-use user::io::read;
+use user::fs::rename;
 
 #[no_mangle]
 fn main(argc: usize, argv: &[&str]) -> i32 {

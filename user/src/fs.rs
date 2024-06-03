@@ -61,15 +61,20 @@ pub fn dup(fd: usize) -> Option<usize> {
     sys_dup(fd).status()
 }
 
-pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
+pub fn link(old_path: &str, new_path: &str) -> Option<()> {
     let old_path = CString::new(old_path).unwrap();
     let new_path = CString::new(new_path).unwrap();
-    sys_linkat(&old_path, &new_path).some()
+    sys_link(&old_path, &new_path).some()
 }
 
-pub fn remove(path: &str) -> Option<()> {
+pub fn unlink(path: &str) -> Option<()> {
     let path = CString::new(path).unwrap();
-    sys_unlinkat(&path).some()
+    sys_unlink(&path).some()
+}
+
+pub fn rmdir(path: &str) -> Option<()> {
+    let path = CString::new(path).unwrap();
+    sys_rmdir(&path).some()
 }
 
 pub fn getcwd() -> String {
@@ -92,7 +97,10 @@ pub fn getcwd() -> String {
 
 pub fn fstat(fd: usize) -> Option<Stat> {
     let mut stat = MaybeUninit::zeroed();
-    unsafe { sys_fstat(fd, stat.as_mut_ptr()).some() }
+    unsafe {
+        sys_fstat(fd, stat.as_mut_ptr()).some()?;
+        Some(stat.assume_init())
+    }
 }
 
 pub fn rename(old_path: &str, new_path: &str) -> Option<()> {

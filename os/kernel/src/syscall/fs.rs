@@ -9,6 +9,7 @@ use crate::fs;
 use crate::fs::PipeRingBuffer;
 use crate::memory;
 use crate::memory::UserBuffer;
+use crate::path::Path;
 use crate::task::processor;
 
 /// try to write `buf` with length `len` to the file with `fd`
@@ -86,22 +87,44 @@ pub fn sys_close(fd: usize) -> isize {
     }
 }
 
-pub fn sys_linkat(oldpath: *const u8, newpath: *const u8) -> isize {
+pub fn sys_link(oldpath: *const u8, newpath: *const u8) -> isize {
     let token = processor::current_user_token();
     let oldpath = memory::read_str(token, oldpath);
     let newpath = memory::read_str(token, newpath);
 
-    match fs::link_at(&oldpath, &newpath) {
+    match fs::link(&oldpath, &newpath) {
         Some(_) => 0,
         None => -1,
     }
 }
 
-pub fn sys_unlinkat(path: *const u8) -> isize {
-    let token = processor::current_user_token();
-    let path = memory::read_str(token, path);
+pub fn sys_unlink(path: *const u8) -> isize {
+    let process = processor::current_process();
+    let process = process.inner().exclusive_access();
 
-    match fs::unlink_at(&path) {
+    let path = memory::read_str(process.user_token(), path);
+    let Some(path) = path.canonicalize(&process.cwd) else {
+        return -1;
+    };
+    drop(process);
+
+    match fs::unlink(&path) {
+        Some(_) => 0,
+        None => -1,
+    }
+}
+
+pub fn sys_rmdir(path: *const u8) -> isize {
+    let process = processor::current_process();
+    let process = process.inner().exclusive_access();
+
+    let path = memory::read_str(process.user_token(), path);
+    let Some(path) = path.canonicalize(&process.cwd) else {
+        return -1;
+    };
+    drop(process);
+
+    match fs::rmdir(&path) {
         Some(_) => 0,
         None => -1,
     }

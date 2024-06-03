@@ -232,14 +232,32 @@ pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
 
 #[allow(unused_variables)]
 #[inline]
-pub fn link_at(old_path: &str, new_path: &str) -> Option<()> {
+pub fn link(old_path: &str, new_path: &str) -> Option<()> {
     None
 }
 
-#[allow(unused_variables)]
-#[inline]
-pub fn unlink_at(path: &str) -> Option<()> {
-    None
+/// `path`是标准路径
+pub fn unlink(path: &str) -> Option<()> {
+    let parent = path.parent()?;
+    let file_name = path.file_name()?;
+    let parent = open(parent, OpenFlag::RDWR.into())?;
+    let mut parent = parent.inner.exclusive_access();
+    parent
+        .inode
+        .unlink(file_name, &mut FS.exclusive_access())
+        .ok()?;
+    Some(())
+}
+
+/// `path`是标准路径
+pub fn rmdir(path: &str) -> Option<()> {
+    // 不能删除根目录
+    let parent = path.parent()?;
+    let dir = path.file_name()?;
+    let parent = open(parent, OpenFlag::RDWR.into())?;
+    let mut parent = parent.inner.exclusive_access();
+    parent.inode.rmdir(dir, &mut FS.exclusive_access()).ok()?;
+    Some(())
 }
 
 /// # 参数
