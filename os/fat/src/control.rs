@@ -8,16 +8,16 @@ use block_dev::BlockDevice;
 
 use crate::volume::{
     data::DataArea,
-    fat::FatArea,
+    fat::Fat,
     reserved::{bpb, init_bpb, Bpb, FsInfo},
 };
 use crate::{sector, ClusterId, SectorId};
 
 #[derive(Debug)]
 pub struct FatFileSystem {
-    /// FAT区的起始扇区
-    fat_area: FatArea,
-    /// 数据区的起始扇区
+    /// FAT
+    fat: Fat,
+    /// 数据区
     data_area: DataArea,
 }
 
@@ -32,7 +32,7 @@ impl FatFileSystem {
         sector::init_cache(dev);
 
         let fs = FatFileSystem {
-            fat_area: FatArea::new(&bpb),
+            fat: Fat::new(&bpb),
             data_area: DataArea::new(&bpb),
         };
         init_bpb(bpb);
@@ -42,7 +42,7 @@ impl FatFileSystem {
     pub fn new(disk_size: usize) -> Self {
         let bpb = Bpb::new(disk_size);
         let fs = FatFileSystem {
-            fat_area: FatArea::new(&bpb),
+            fat: Fat::new(&bpb),
             data_area: DataArea::new(&bpb),
         };
         init_bpb(bpb);
@@ -56,12 +56,12 @@ impl FatFileSystem {
         sector::get(SectorId::new(0))
             .lock()
             .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(bpb));
-        sector::get(SectorId::new(6))
+        sector::get(bpb.backup_boot())
             .lock()
             .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(bpb));
 
         let fs_info = FsInfo::new(bpb);
-        sector::get(SectorId::new(1))
+        sector::get(bpb.fs_info())
             .lock()
             .map_mut(0, |disk_fs_info: &mut FsInfo| {
                 disk_fs_info.clone_from(&fs_info)
@@ -70,23 +70,23 @@ impl FatFileSystem {
             .lock()
             .map_mut(0, |disk_fs_info: &mut FsInfo| *disk_fs_info = fs_info);
 
-        for sid in self.fat_area.range() {
+        for sid in self.fat.range() {
             sector::get(sid)
                 .lock()
                 .map_mut_slice(|cids: &mut [ClusterId<u32>]| cids.fill(ClusterId::FREE));
         }
 
-        self.fat_area.alloc_root();
+        self.fat.alloc_root();
 
         sector::sync_all();
     }
 
-    pub const fn fat(&self) -> &FatArea {
-        &self.fat_area
+    pub const fn fat(&self) -> &Fat {
+        &self.fat
     }
 
-    pub fn fat_mut(&mut self) -> &mut FatArea {
-        &mut self.fat_area
+    pub fn fat_mut(&mut self) -> &mut Fat {
+        &mut self.fat
     }
 
     pub const fn data(&self) -> &DataArea {
@@ -94,7 +94,7 @@ impl FatFileSystem {
     }
 
     pub fn alloc_cluster(&mut self) -> (ClusterId<u32>, Range<SectorId>) {
-        let id = self.fat_area.alloc().unwrap();
+        let id = self.fat.alloc().unwrap();
         let sectors = self
             .data_area
             .cluster(id)
@@ -135,7 +135,7 @@ impl Iterator for DataSectors<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.id.take()?;
         let sectors = self.control.data_area.cluster(id).unwrap();
-        self.id = self.control.fat_area.next(id).unwrap();
+        self.id = self.control.fat.next(id).unwrap();
         Some(sectors)
     }
 }
@@ -231,11 +231,7 @@ impl<'a> SectorCursor<'a> {
             let next_cid = match self.clusters.get(next_ci) {
                 Some(&next_cid) => next_cid,
                 None => {
-                    let next_cid = self
-                        .control
-                        .fat_area
-                        .next(self.clusters[*cindex])
-                        .unwrap()?;
+                    let next_cid = self.control.fat.next(self.clusters[*cindex]).unwrap()?;
                     self.clusters.push(next_cid);
                     next_cid
                 }

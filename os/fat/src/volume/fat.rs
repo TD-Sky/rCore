@@ -5,15 +5,16 @@ use crate::volume::reserved::{self, bpb, Bpb};
 use crate::{sector, SectorId};
 use crate::{ClusterError, ClusterId};
 
+/// File Allocation Table
 #[derive(Debug)]
-pub struct FatArea {
+pub struct Fat {
     range: Range<SectorId>,
 }
 
-impl FatArea {
+impl Fat {
     pub fn new(bpb: &Bpb) -> Self {
-        let start = bpb.fat_area_sector();
-        let end = start + bpb.fat_count() * bpb.fat_sectors();
+        let start = bpb.fat_area();
+        let end = start + bpb.fat_sectors();
 
         Self {
             range: Range { start, end },
@@ -124,7 +125,7 @@ impl FatArea {
     }
 }
 
-impl FatArea {
+impl Fat {
     const SET_CLN_SHUT: u32 = 0x08000000;
     const SET_HRD_ERR: u32 = 0x04000000;
 

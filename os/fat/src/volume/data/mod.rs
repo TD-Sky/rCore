@@ -13,7 +13,7 @@ pub struct DataArea {
 
 impl DataArea {
     pub fn new(bpb: &Bpb) -> Self {
-        let start = bpb.data_area_sector();
+        let start = bpb.data_area();
         let end = SectorId::new(bpb.total_sectors());
         Self { range: start..end }
     }

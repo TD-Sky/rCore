@@ -68,14 +68,14 @@ pub struct Bpb {
     /// FAT占用扇区数
     fat_sz32: NonZeroU32,
 
-    ext_flags: ExtFlags,
+    _ext_flags: ExtFlags,
 
     /// 卷版本号，为0x0
-    fs_ver: u16,
+    _fs_ver: u16,
 
     /// 根目录首个簇的编号，
     /// 应该为2，或首个可用的簇编号
-    root_clus: u32,
+    _root_clus: u32,
 
     /// FSINFO所在扇区号（此扇区位于保留区），通常为1
     fs_info: u16,
@@ -108,7 +108,7 @@ pub struct Bpb {
     _reserved2: [u8; 420],
 
     /// [0x55, 0xAA]
-    signature_word: [u8; 2],
+    _signature_word: [u8; 2],
 }
 
 /* 扇区剩余部分皆填0x00 */
@@ -223,9 +223,9 @@ impl Bpb {
             _hidd_sec: Default::default(),
             tot_sec32: NonZero::new(tot_sec32 as u32).expect("Disk size should be enough"),
             fat_sz32: unsafe { NonZero::new_unchecked(1) }, // 仅仅是用来占位
-            ext_flags: Default::default(),
-            fs_ver: 0x0,
-            root_clus: 2,
+            _ext_flags: Default::default(),
+            _fs_ver: 0x0,
+            _root_clus: 2,
             fs_info: 1,
             bk_boot_sec: 6,
             _reserved: Default::default(),
@@ -236,7 +236,7 @@ impl Bpb {
             _voll_lab: *b"NO NAME    ",
             _fil_sys_type: *b"FAT32   ",
             _reserved2: [0; 420],
-            signature_word: [0x55, 0xAA],
+            _signature_word: [0x55, 0xAA],
         };
 
         bpb.set_fat_size(FatType::T32, disk_size);
@@ -244,7 +244,15 @@ impl Bpb {
         bpb
     }
 
-    pub const fn fat_area_sector(&self) -> SectorId {
+    pub const fn fs_info(&self) -> SectorId {
+        SectorId::new(self.fs_info as usize)
+    }
+
+    pub const fn backup_boot(&self) -> SectorId {
+        SectorId::new(self.bk_boot_sec as usize)
+    }
+
+    pub const fn fat_area(&self) -> SectorId {
         SectorId::new(self.rsvd_sec_cnt.get() as usize)
     }
 
@@ -252,8 +260,8 @@ impl Bpb {
         self.num_fats.get() as usize
     }
 
-    pub fn data_area_sector(&self) -> SectorId {
-        self.fat_area_sector()
+    pub fn data_area(&self) -> SectorId {
+        self.fat_area()
             + self.num_fats.get() as usize * self.fat_sectors()
             + self.root_dir_sectors()
     }
@@ -284,7 +292,7 @@ impl Bpb {
     }
 
     pub fn total_clusters(&self) -> usize {
-        (self.total_sectors() - usize::from(self.data_area_sector())) / self.sec_per_clus as usize
+        (self.total_sectors() - usize::from(self.data_area())) / self.sec_per_clus as usize
     }
 }
 
@@ -297,6 +305,7 @@ impl Bpb {
             as usize
     }
 
+    #[allow(dead_code)]
     fn fat_type(&self) -> FatType {
         let clusters = self.total_clusters();
 
