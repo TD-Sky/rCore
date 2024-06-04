@@ -11,6 +11,7 @@ use fat::Inode;
 use fat::ROOT;
 use spin::Lazy;
 use vfs::CDirEntry;
+use vfs::DirEntryType;
 use vfs::Stat;
 
 use super::File;
@@ -295,4 +296,14 @@ pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
     // };
 
     todo!()
+}
+
+/// `path`为标准路径
+pub fn metadata(path: &str) -> Option<DirEntryType> {
+    if path == "/" {
+        Some(vfs::DirEntryType::Directory)
+    } else {
+        ROOT.find(path.root_relative().unwrap(), &FS.exclusive_access())
+            .map(|inode| inode.kind())
+    }
 }

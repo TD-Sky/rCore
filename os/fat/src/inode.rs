@@ -26,6 +26,10 @@ pub struct Inode {
 }
 
 impl Inode {
+    pub fn kind(&self) -> DirEntryType {
+        self.ty
+    }
+
     /// 目录
     ///
     /// # 参数

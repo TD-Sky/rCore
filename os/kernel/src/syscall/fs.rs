@@ -3,7 +3,7 @@
 use core::mem;
 
 use enumflags2::BitFlags;
-use vfs::{CDirEntry, Stat};
+use vfs::{CDirEntry, DirEntryType, Stat};
 
 use crate::fs;
 use crate::fs::PipeRingBuffer;
@@ -241,4 +241,22 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
     }
 
     cwd_len as isize
+}
+
+pub fn sys_chdir(path: *const u8) -> isize {
+    let process = processor::current_process();
+    let mut process = process.inner().exclusive_access();
+
+    let token = process.user_token();
+    let path = memory::read_str(token, path);
+    let Some(path) = path.canonicalize(&process.cwd) else {
+        return -1;
+    };
+    if fs::metadata(&path) != Some(DirEntryType::Directory) {
+        return -1;
+    }
+
+    process.cwd = path;
+
+    0
 }

@@ -95,6 +95,11 @@ pub fn getcwd() -> String {
     String::from_utf8(buf).expect("Valid UTF-8 CWD")
 }
 
+pub fn chdir(path: &str) -> Option<()> {
+    let path = CString::new(path).unwrap();
+    sys_chdir(&path).some()
+}
+
 pub fn fstat(fd: usize) -> Option<Stat> {
     let mut stat = MaybeUninit::zeroed();
     unsafe {

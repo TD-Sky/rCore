@@ -5,38 +5,40 @@ use vfs::{CDirEntry, Stat};
 
 use crate::signal::SignalAction;
 
-const LINK: usize = 9;
-const UNLINK: usize = 10;
-const DUP: usize = 24;
-const RMDIR: usize = 40;
-const OPEN: usize = 56;
-const CLOSE: usize = 57;
-const PIPE: usize = 59;
-const GETDENTS: usize = 61;
-const READ: usize = 63;
-const WRITE: usize = 64;
+const READ: usize = 0;
+const WRITE: usize = 1;
+const OPEN: usize = 2;
+const CLOSE: usize = 3;
+const FSTAT: usize = 5;
+const PIPE: usize = 22;
+const DUP: usize = 32;
+const GETPID: usize = 39;
+const FORK: usize = 57;
+const EXIT: usize = 60;
+const KILL: usize = 62;
+const GETDENTS: usize = 78;
 const GETCWD: usize = 79;
-const FSTAT: usize = 80;
+const CHDIR: usize = 80;
 const RENAME: usize = 82;
-const EXIT: usize = 93;
+const MKDIR: usize = 83;
+const RMDIR: usize = 84;
+const LINK: usize = 86;
+const UNLINK: usize = 87;
 const SLEEP: usize = 101;
 const YIELD: usize = 124;
 const SIGACTION: usize = 134;
 const SIGPROCMASK: usize = 135;
 const SIGRETURN: usize = 139;
-const TIME: usize = 169;
-const GETPID: usize = 172;
+const GET_TIME: usize = 169;
+const GETTID: usize = 186;
 const SBRK: usize = 214;
-const KILL: usize = 219;
 const MUNMAP: usize = 215;
-const FORK: usize = 220;
 const EXEC: usize = 221;
 const MMAP: usize = 222;
 const WAITPID: usize = 260;
 const EVENTFD: usize = 290;
 const SPAWN: usize = 400;
 const SPAWN_THREAD: usize = 1000;
-const GETTID: usize = 1001;
 const WAITTID: usize = 1002;
 const MUTEX_CREATE: usize = 1010;
 const MUTEX_LOCK: usize = 1011;
@@ -124,7 +126,7 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_get_time() -> isize {
-    syscall(TIME, [0, 0, 0])
+    syscall(GET_TIME, [0, 0, 0])
 }
 
 pub fn sys_sbrk(size: i32) -> isize {
@@ -185,6 +187,10 @@ pub fn sys_link(oldpath: &CStr, newpath: &CStr) -> isize {
 
 pub fn sys_unlink(path: &CStr) -> isize {
     syscall(UNLINK, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_chdir(path: &CStr) -> isize {
+    syscall(CHDIR, [path.as_ptr() as usize, 0, 0])
 }
 
 pub fn sys_rmdir(path: &CStr) -> isize {
