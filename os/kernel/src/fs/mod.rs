@@ -63,4 +63,14 @@ pub trait File: Debug + Send + Sync {
     fn mkdir(&self, name: &str) -> Result<(), vfs::Error> {
         Err(vfs::Error::Unsupported)
     }
+
+    #[allow(unused_variables)]
+    fn unlink(&self, name: &str) -> Result<(), vfs::Error> {
+        Err(vfs::Error::Unsupported)
+    }
+
+    #[allow(unused_variables)]
+    fn rmdir(&self, name: &str) -> Result<(), vfs::Error> {
+        Err(vfs::Error::Unsupported)
+    }
 }

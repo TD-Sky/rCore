@@ -168,6 +168,16 @@ impl File for OSInode {
         inner.inode.mkdir(name, &mut FS.exclusive_access())?;
         Ok(())
     }
+
+    fn unlink(&self, name: &str) -> Result<(), vfs::Error> {
+        let mut inner = self.inner.exclusive_access();
+        inner.inode.unlink(name, &mut FS.exclusive_access())
+    }
+
+    fn rmdir(&self, name: &str) -> Result<(), vfs::Error> {
+        let mut inner = self.inner.exclusive_access();
+        inner.inode.rmdir(name, &mut FS.exclusive_access())
+    }
 }
 
 #[rustfmt::skip]
@@ -225,11 +235,9 @@ pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
     let create = flags.contains(OpenFlag::CREATE);
 
     let mut fs = FS.exclusive_access();
-    let relat_path = path.trim_start_matches('/');
-
-    if relat_path.is_empty() {
+    let Some(relat_path) = path.root_relative() else {
         return Some(Arc::new(OSInode::new(readable, writable, ROOT.clone())));
-    }
+    };
 
     ROOT.find(relat_path, &fs)
         .map(|mut inode| {
@@ -258,30 +266,6 @@ pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
 #[inline]
 pub fn link(old_path: &str, new_path: &str) -> Option<()> {
     None
-}
-
-/// `path`是标准路径
-pub fn unlink(path: &str) -> Option<()> {
-    let parent = path.parent()?;
-    let file_name = path.file_name()?;
-    let parent = open(parent, OpenFlag::RDWR.into())?;
-    let mut parent = parent.inner.exclusive_access();
-    parent
-        .inode
-        .unlink(file_name, &mut FS.exclusive_access())
-        .ok()?;
-    Some(())
-}
-
-/// `path`是标准路径
-pub fn rmdir(path: &str) -> Option<()> {
-    // 不能删除根目录
-    let parent = path.parent()?;
-    let dir = path.file_name()?;
-    let parent = open(parent, OpenFlag::RDWR.into())?;
-    let mut parent = parent.inner.exclusive_access();
-    parent.inode.rmdir(dir, &mut FS.exclusive_access()).ok()?;
-    Some(())
 }
 
 /// # 参数

@@ -109,9 +109,16 @@ pub fn sys_unlink(path: *const u8) -> isize {
     };
     drop(process);
 
-    match fs::unlink(&path) {
-        Some(_) => 0,
-        None => -1,
+    let Some((parent, name)) = path.parent_file() else {
+        return -1;
+    };
+    let Ok(dir) = fs::open_dir(parent) else {
+        return -1;
+    };
+
+    match dir.unlink(name) {
+        Ok(_) => 0,
+        Err(_) => -1,
     }
 }
 
@@ -149,9 +156,16 @@ pub fn sys_rmdir(path: *const u8) -> isize {
     };
     drop(process);
 
-    match fs::rmdir(&path) {
-        Some(_) => 0,
-        None => -1,
+    let Some((parent, name)) = path.parent_file() else {
+        return -1;
+    };
+    let Ok(dir) = fs::open_dir(parent) else {
+        return -1;
+    };
+
+    match dir.rmdir(name) {
+        Ok(_) => 0,
+        Err(_) => -1,
     }
 }
 
