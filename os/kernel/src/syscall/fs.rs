@@ -192,11 +192,31 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
 }
 
 pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> isize {
-    let token = processor::current_user_token();
-    let oldpath = memory::read_str(token, oldpath);
-    let newpath = memory::read_str(token, newpath);
+    let process = processor::current_process();
+    let process = process.inner().exclusive_access();
+    let token = process.user_token();
 
-    todo!()
+    let Some(oldpath) = memory::read_str(token, oldpath).canonicalize(&process.cwd) else {
+        return -1;
+    };
+    let Some(newpath) = memory::read_str(token, newpath).canonicalize(&process.cwd) else {
+        return -1;
+    };
+    drop(process);
+    if newpath.starts_with(&oldpath) {
+        // 不可以将父目录移到下属的子目录；或两路径不能相同
+        return -1;
+    }
+    let Some((old_parent, old_name)) = oldpath.parent_file() else {
+        return -1;
+    };
+    let Ok(dir) = fs::open_dir(old_parent) else {
+        return -1;
+    };
+    match dir.rename(old_name, &newpath) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
 }
 
 pub fn sys_pipe(pipe: *mut usize) -> isize {
@@ -287,8 +307,7 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let mut process = process.inner().exclusive_access();
 
     let token = process.user_token();
-    let path = memory::read_str(token, path);
-    let Some(path) = path.canonicalize(&process.cwd) else {
+    let Some(path) = memory::read_str(token, path).canonicalize(&process.cwd) else {
         return -1;
     };
     if path == process.cwd {

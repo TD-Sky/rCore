@@ -178,6 +178,40 @@ impl File for OSInode {
         let mut inner = self.inner.exclusive_access();
         inner.inode.rmdir(name, &mut FS.exclusive_access())
     }
+
+    fn rename(&self, old_name: &str, newpath: &str) -> Result<(), vfs::Error> {
+        let inner = self.inner.exclusive_access();
+
+        let (mut new_parent, new_name) = match open_dir_inode(newpath) {
+            Ok(p) => (p, old_name),
+            Err(vfs::Error::NotADirectory) => {
+                let (parent, file) = newpath.parent_file().expect("path was verified as not `/`");
+                (open_dir_inode(parent)?, file)
+            }
+            Err(e) => return Err(e),
+        };
+
+        if inner.inode.id() == new_parent.id() {
+            // 当前目录
+            if old_name == new_name {
+                return Err(vfs::Error::AlreadyExists);
+            } else {
+                inner
+                    .inode
+                    .rename(old_name, None, new_name, &mut FS.exclusive_access())?;
+            }
+        } else {
+            // 跨目录
+            inner.inode.rename(
+                old_name,
+                Some(&mut new_parent),
+                new_name,
+                &mut FS.exclusive_access(),
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 #[rustfmt::skip]
@@ -209,8 +243,12 @@ impl OpenFlag {
 
 /// `path`为标准路径
 pub fn open_dir(path: &str) -> Result<Arc<OSInode>, vfs::Error> {
-    let inode = if path == "/" {
-        ROOT.clone()
+    open_dir_inode(path).map(|inode| Arc::new(OSInode::new(true, true, inode)))
+}
+
+fn open_dir_inode(path: &str) -> Result<Inode, vfs::Error> {
+    if path == "/" {
+        Ok(ROOT.clone())
     } else {
         let inode = ROOT
             .find(path.root_relative().unwrap(), &FS.exclusive_access())
@@ -218,10 +256,8 @@ pub fn open_dir(path: &str) -> Result<Arc<OSInode>, vfs::Error> {
         if inode.kind() != DirEntryType::Directory {
             return Err(vfs::Error::NotADirectory);
         }
-        inode
-    };
-
-    Ok(Arc::new(OSInode::new(true, true, inode)))
+        Ok(inode)
+    }
 }
 
 pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
@@ -268,39 +304,39 @@ pub fn link(old_path: &str, new_path: &str) -> Option<()> {
     None
 }
 
-/// # 参数
-///
-/// `old_path`和`new_path`都是标准路径。
-pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
-    // let fs = FS.exclusive_access();
-    //
-    // if new_path.starts_with(old_path) {
-    //     // 倒反天罡: /foo/bar -> /foo/bar/zoo
-    //     return None;
-    // }
-    //
-    // let old_parent = old_path.parent()?;
-    // let new_parent = new_path.parent();
-    //
-    // if old_parent == new_path {
-    //     // 原地命名，跳过
-    //     return None;
-    // }
-    //
-    // if Some(old_parent) == new_parent {
-    //     // 同一目录下的重命名
-    //     let old_name = old_path
-    //         .file_name()
-    //         .expect("it has parent, should has file name");
-    //     let new_name = new_path.file_name();
-    //     let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
-    // }
-    //
-    // let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
-    // let new_parent = match new_path.parent().and_then(|p| p.root_relative()) {
-    //     Some(parent) => &ROOT.find(parent, &fs)?,
-    //     None => &ROOT,
-    // };
-
-    todo!()
-}
+// /// # 参数
+// ///
+// /// `old_path`和`new_path`都是标准路径。
+// pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
+//     // let fs = FS.exclusive_access();
+//     //
+//     // if new_path.starts_with(old_path) {
+//     //     // 倒反天罡: /foo/bar -> /foo/bar/zoo
+//     //     return None;
+//     // }
+//     //
+//     // let old_parent = old_path.parent()?;
+//     // let new_parent = new_path.parent();
+//     //
+//     // if old_parent == new_path {
+//     //     // 原地命名，跳过
+//     //     return None;
+//     // }
+//     //
+//     // if Some(old_parent) == new_parent {
+//     //     // 同一目录下的重命名
+//     //     let old_name = old_path
+//     //         .file_name()
+//     //         .expect("it has parent, should has file name");
+//     //     let new_name = new_path.file_name();
+//     //     let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
+//     // }
+//     //
+//     // let old_parent = ROOT.find(old_parent.root_relative()?, &fs)?;
+//     // let new_parent = match new_path.parent().and_then(|p| p.root_relative()) {
+//     //     Some(parent) => &ROOT.find(parent, &fs)?,
+//     //     None => &ROOT,
+//     // };
+//
+//     todo!()
+// }

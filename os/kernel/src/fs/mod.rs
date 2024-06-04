@@ -73,4 +73,9 @@ pub trait File: Debug + Send + Sync {
     fn rmdir(&self, name: &str) -> Result<(), vfs::Error> {
         Err(vfs::Error::Unsupported)
     }
+
+    #[allow(unused_variables)]
+    fn rename(&self, old_name: &str, newpath: &str) -> Result<(), vfs::Error> {
+        Err(vfs::Error::Unsupported)
+    }
 }

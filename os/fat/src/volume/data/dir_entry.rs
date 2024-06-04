@@ -337,8 +337,10 @@ pub fn name2dirents(name: &str) -> (ShortDirEntry, Vec<LongDirEntry>) {
 ///
 /// # 返回
 ///
+/// - `ShortDirEntry`: 重命名过的短目录项。
 /// - `Vec<LongDirEntry>`: **反序排列**的长目录项，已全数赋值。
-pub fn rename_dirents(short: &mut ShortDirEntry, new_name: &str) -> Vec<LongDirEntry> {
+pub fn rename_dirents(short: &ShortDirEntry, new_name: &str) -> (ShortDirEntry, Vec<LongDirEntry>) {
+    let mut short = *short;
     short.rename(new_name);
     let chksum = short.checksum();
 
@@ -366,7 +368,7 @@ pub fn rename_dirents(short: &mut ShortDirEntry, new_name: &str) -> Vec<LongDirE
 
     longs[0].ord |= LongDirEntry::LAST_MASK;
 
-    longs
+    (short, longs)
 }
 
 pub fn sector_dirents() -> usize {

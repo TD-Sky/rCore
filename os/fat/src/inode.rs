@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::cmp::Ordering;
 use core::mem;
 
 use vfs::{DirEntryType, Stat};
@@ -26,6 +25,10 @@ pub struct Inode {
 }
 
 impl Inode {
+    pub fn id(&self) -> u64 {
+        self.start_id.into()
+    }
+
     pub fn kind(&self) -> DirEntryType {
         self.ty
     }
@@ -308,7 +311,9 @@ impl Inode {
         if inode.ty == DirEntryType::Directory {
             return Err(vfs::Error::IsADirectory);
         }
-        sb.fat_mut().dealloc(inode.start_id).unwrap();
+        if inode.start_id != ClusterId::FREE {
+            sb.fat_mut().dealloc(inode.start_id).unwrap();
+        }
         self.remove(inode.range, sb);
 
         Ok(())
@@ -334,29 +339,45 @@ impl Inode {
     }
 
     /// 目录
+    ///
+    /// 当`new_parent`为`None`时，`old_name`和`new_name`必须不同。
     pub fn rename(
         &self,
         old_name: &str,
+        new_parent: Option<&mut Self>,
         new_name: &str,
         sb: &mut FatFileSystem,
     ) -> Result<(), vfs::Error> {
         debug_assert_eq!(self.ty, DirEntryType::Directory);
 
-        let mut inode = self.find_cwd(old_name, sb).ok_or(vfs::Error::NotFound)?;
-        let new_longs = inode
+        let src = self.find_cwd(old_name, sb).ok_or(vfs::Error::NotFound)?;
+        let (short, new_longs) = src
             .range
             .short
-            .access_mut(|short| rename_dirents(short, new_name));
+            .access(|short| rename_dirents(short, new_name));
 
-        let n_old_long = old_name.len().div_ceil(LongDirEntry::CAP);
-        match n_old_long.cmp(&new_longs.len()) {
-            Ordering::Less => {
-                let short = inode.range.short.get();
-                self.remove(inode.range, sb);
-                self.create(new_name, short, new_longs, sb)?;
+        if let Some(new_parent) = new_parent {
+            // Rename to another directory
+            debug_assert_eq!(new_parent.ty, DirEntryType::Directory);
+
+            if let Some(dest) = new_parent.find_cwd(new_name, sb) {
+                match (src.ty, dest.ty) {
+                    (DirEntryType::Directory, DirEntryType::Directory) => {
+                        // 对于非空的目录，删除失败就退出
+                        new_parent.rmdir(new_name, sb)?;
+                        self.remove(src.range, sb);
+                        new_parent.create(new_name, short, new_longs, sb)?;
+                    }
+                    (_, DirEntryType::Directory) => return Err(vfs::Error::IsADirectory),
+                    (DirEntryType::Directory, _) => return Err(vfs::Error::NotADirectory),
+                    _ => todo!(),
+                }
             }
-            Ordering::Equal => inode.range.write_longs(&new_longs),
-            Ordering::Greater => inode.range.shrink_longs(n_old_long, &new_longs),
+        } else {
+            // Rename currently
+            debug_assert_ne!(old_name, new_name);
+            self.remove(src.range, sb);
+            self.create(new_name, short, new_longs, sb)?;
         }
 
         Ok(())
@@ -818,7 +839,28 @@ impl DirEntryRange {
         }
     }
 
-    fn shrink_longs(&mut self, n_old_long: usize, new_longs: &[LongDirEntry]) {
+    fn clear(&self, free_as: &FreeDirEntry) {
+        let Self { last_long, short } = self;
+
+        if self.is_discrete() {
+            sector::get(last_long.sector)
+                .lock()
+                .map_mut_slice(|dirents: &mut [FreeDirEntry]| {
+                    dirents[last_long.nth..].fill(*free_as);
+                });
+            sector::get(short.sector)
+                .lock()
+                .map_mut_slice(|dirents: &mut [FreeDirEntry]| dirents[..=short.nth].fill(*free_as));
+        } else {
+            sector::get(short.sector)
+                .lock()
+                .map_mut_slice(|dirents: &mut [FreeDirEntry]| {
+                    dirents[last_long.nth..=short.nth].fill(*free_as);
+                });
+        }
+    }
+
+    /* fn shrink_longs(&mut self, n_old_long: usize, new_longs: &[LongDirEntry]) {
         let is_discrete = self.is_discrete();
         let n_prune = n_old_long - new_longs.len();
         let Self { last_long, short } = self;
@@ -847,28 +889,7 @@ impl DirEntryRange {
         }
 
         self.write_longs(new_longs);
-    }
-
-    fn clear(&self, free_as: &FreeDirEntry) {
-        let Self { last_long, short } = self;
-
-        if self.is_discrete() {
-            sector::get(last_long.sector)
-                .lock()
-                .map_mut_slice(|dirents: &mut [FreeDirEntry]| {
-                    dirents[last_long.nth..].fill(*free_as);
-                });
-            sector::get(short.sector)
-                .lock()
-                .map_mut_slice(|dirents: &mut [FreeDirEntry]| dirents[..=short.nth].fill(*free_as));
-        } else {
-            sector::get(short.sector)
-                .lock()
-                .map_mut_slice(|dirents: &mut [FreeDirEntry]| {
-                    dirents[last_long.nth..=short.nth].fill(*free_as);
-                });
-        }
-    }
+    } */
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -883,12 +904,6 @@ impl DirEntryPos {
 
     pub const fn new(sector: SectorId, nth: usize) -> Self {
         Self { sector, nth }
-    }
-
-    pub fn get(&self) -> ShortDirEntry {
-        *sector::get(self.sector)
-            .lock()
-            .get(self.nth * mem::size_of::<ShortDirEntry>())
     }
 
     pub fn access<F, R>(&self, f: F) -> R
@@ -908,6 +923,12 @@ impl DirEntryPos {
             .lock()
             .map_mut(self.nth * mem::size_of::<ShortDirEntry>(), f)
     }
+
+    /* pub fn get(&self) -> ShortDirEntry {
+        *sector::get(self.sector)
+            .lock()
+            .get(self.nth * mem::size_of::<ShortDirEntry>())
+    } */
 }
 
 impl From<(DirEntryRange, &ShortDirEntry)> for Inode {

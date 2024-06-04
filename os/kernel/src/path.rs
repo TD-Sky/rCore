@@ -100,5 +100,6 @@ impl Path for str {
         }
 
         self.rsplit_once('/')
+            .map(|(p, f)| if p.is_empty() { ("/", f) } else { (p, f) })
     }
 }
