@@ -58,4 +58,9 @@ pub trait File: Debug + Send + Sync {
     fn getdents(&self, buf: UserBuffer, len: usize) -> usize {
         0
     }
+
+    #[allow(unused_variables)]
+    fn mkdir(&self, name: &str) -> Result<(), vfs::Error> {
+        Err(vfs::Error::Unsupported)
+    }
 }

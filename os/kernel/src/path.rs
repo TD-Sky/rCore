@@ -30,6 +30,9 @@ pub trait Path: ToOwned {
     /// Returns [`None`] if the path terminates in ...
     fn file_name(&self) -> Option<&Self>;
 
+    /// 返回路径的`(父目录, 文件名)`
+    fn parent_file(&self) -> Option<(&Self, &Self)>;
+
     fn is_relative(&self) -> bool {
         !self.is_absolute()
     }
@@ -81,12 +84,21 @@ impl Path for str {
         (self != "/").then_some(self.trim_start_matches('/'))
     }
 
-    //WARN: 暂时先假设传进来的是标准路径
+    //WARN: 暂时先假设路径不包含`.`与`..`
     fn file_name(&self) -> Option<&Self> {
         let file_name = self.rsplit_once('/')?.1;
         if file_name.is_empty() && self.is_absolute() {
             return None;
         }
         Some(file_name)
+    }
+
+    //WARN: 暂时先假设路径不包含`.`与`..`
+    fn parent_file(&self) -> Option<(&Self, &Self)> {
+        if self == "/" {
+            return None;
+        }
+
+        self.rsplit_once('/')
     }
 }

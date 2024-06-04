@@ -3,9 +3,10 @@
 use core::mem;
 
 use enumflags2::BitFlags;
-use vfs::{CDirEntry, DirEntryType, Stat};
+use vfs::{CDirEntry, Stat};
 
 use crate::fs;
+use crate::fs::File;
 use crate::fs::PipeRingBuffer;
 use crate::memory;
 use crate::memory::UserBuffer;
@@ -112,6 +113,30 @@ pub fn sys_unlink(path: *const u8) -> isize {
         Some(_) => 0,
         None => -1,
     }
+}
+
+pub fn sys_mkdir(path: *const u8) -> isize {
+    let process = processor::current_process();
+    let process = process.inner().exclusive_access();
+
+    let token = process.user_token();
+    let path = memory::read_str(token, path);
+    let Some(path) = path.canonicalize(&process.cwd) else {
+        return -1;
+    };
+    drop(process);
+
+    let Some((parent, name)) = path.parent_file() else {
+        return -1;
+    };
+    let Ok(dir) = fs::open_dir(parent) else {
+        return -1;
+    };
+    if dir.mkdir(name).is_err() {
+        return -1;
+    }
+
+    0
 }
 
 pub fn sys_rmdir(path: *const u8) -> isize {
@@ -252,7 +277,10 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let Some(path) = path.canonicalize(&process.cwd) else {
         return -1;
     };
-    if fs::metadata(&path) != Some(DirEntryType::Directory) {
+    if path == process.cwd {
+        return 0;
+    }
+    if fs::open_dir(&path).is_err() {
         return -1;
     }
 

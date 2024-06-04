@@ -74,7 +74,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         GETCWD => sys_getcwd(args[0] as _, args[1]),
         CHDIR => sys_chdir(args[0] as _),
         RENAME => sys_rename(args[0] as _, args[1] as _),
-        MKDIR => sys_mkdir(args[0] as _, args[1] as _),
+        MKDIR => sys_mkdir(args[0] as _),
         RMDIR => sys_rmdir(args[0] as _),
         LINK => sys_link(args[0] as _, args[1] as _),
         UNLINK => sys_unlink(args[0] as _),

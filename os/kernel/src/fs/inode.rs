@@ -162,6 +162,12 @@ impl File for OSInode {
         inner.offset += read;
         read
     }
+
+    fn mkdir(&self, name: &str) -> Result<(), vfs::Error> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.mkdir(name, &mut FS.exclusive_access())?;
+        Ok(())
+    }
 }
 
 #[rustfmt::skip]
@@ -189,6 +195,23 @@ impl OpenFlag {
     pub fn read_only() -> BitFlags<OpenFlag> {
         BitFlags::from_bits_truncate(Self::RDONLY)
     }
+}
+
+/// `path`为标准路径
+pub fn open_dir(path: &str) -> Result<Arc<OSInode>, vfs::Error> {
+    let inode = if path == "/" {
+        ROOT.clone()
+    } else {
+        let inode = ROOT
+            .find(path.root_relative().unwrap(), &FS.exclusive_access())
+            .ok_or(vfs::Error::NotFound)?;
+        if inode.kind() != DirEntryType::Directory {
+            return Err(vfs::Error::NotADirectory);
+        }
+        inode
+    };
+
+    Ok(Arc::new(OSInode::new(true, true, inode)))
 }
 
 pub fn open(path: &str, flags: BitFlags<OpenFlag>) -> Option<Arc<OSInode>> {
@@ -296,14 +319,4 @@ pub fn rename(old_path: &str, new_path: &str) -> Option<()> {
     // };
 
     todo!()
-}
-
-/// `path`为标准路径
-pub fn metadata(path: &str) -> Option<DirEntryType> {
-    if path == "/" {
-        Some(vfs::DirEntryType::Directory)
-    } else {
-        ROOT.find(path.root_relative().unwrap(), &FS.exclusive_access())
-            .map(|inode| inode.kind())
-    }
 }

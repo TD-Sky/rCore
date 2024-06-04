@@ -100,6 +100,11 @@ pub fn chdir(path: &str) -> Option<()> {
     sys_chdir(&path).some()
 }
 
+pub fn mkdir(path: &str) -> Option<()> {
+    let path = CString::new(path).unwrap();
+    sys_mkdir(&path).some()
+}
+
 pub fn fstat(fd: usize) -> Option<Stat> {
     let mut stat = MaybeUninit::zeroed();
     unsafe {

@@ -193,6 +193,10 @@ pub fn sys_chdir(path: &CStr) -> isize {
     syscall(CHDIR, [path.as_ptr() as usize, 0, 0])
 }
 
+pub fn sys_mkdir(path: &CStr) -> isize {
+    syscall(MKDIR, [path.as_ptr() as usize, 0, 0])
+}
+
 pub fn sys_rmdir(path: &CStr) -> isize {
     syscall(RMDIR, [path.as_ptr() as usize, 0, 0])
 }
