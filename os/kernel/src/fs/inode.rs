@@ -180,12 +180,19 @@ impl File for OSInode {
     }
 
     fn rename(&self, old_name: &str, newpath: &str) -> Result<(), vfs::Error> {
-        let inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access();
 
         let (mut new_parent, new_name) = match open_dir_inode(newpath) {
-            Ok(p) => (p, old_name),
-            Err(vfs::Error::NotADirectory) => {
+            Ok(p) => {
+                log::info!("{old_name} -> {newpath}/");
+                (p, old_name)
+            }
+            Err(vfs::Error::NotADirectory | vfs::Error::NotFound) => {
                 let (parent, file) = newpath.parent_file().expect("path was verified as not `/`");
+                log::info!(
+                    "{old_name} -> {}/{file}",
+                    parent.root_relative().unwrap_or_default()
+                );
                 (open_dir_inode(parent)?, file)
             }
             Err(e) => return Err(e),
@@ -193,6 +200,7 @@ impl File for OSInode {
 
         if inner.inode.id() == new_parent.id() {
             // 当前目录
+            log::info!("rename currently");
             if old_name == new_name {
                 return Err(vfs::Error::AlreadyExists);
             } else {
@@ -202,6 +210,7 @@ impl File for OSInode {
             }
         } else {
             // 跨目录
+            log::info!("rename cross directories");
             inner.inode.rename(
                 old_name,
                 Some(&mut new_parent),

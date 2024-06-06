@@ -315,6 +315,8 @@ impl Inode {
         }
         self.remove(inode.range, sb);
 
+        sector::sync_all();
+
         Ok(())
     }
 
@@ -334,6 +336,8 @@ impl Inode {
         sb.fat_mut().dealloc(inode.start_id).unwrap();
         self.remove(inode.range, sb);
 
+        sector::sync_all();
+
         Ok(())
     }
 
@@ -341,9 +345,9 @@ impl Inode {
     ///
     /// 当`new_parent`为`None`时，`old_name`和`new_name`必须不同。
     pub fn rename(
-        &self,
+        &mut self,
         old_name: &str,
-        new_parent: Option<&mut Self>,
+        mut new_parent: Option<&mut Self>,
         new_name: &str,
         sb: &mut FatFileSystem,
     ) -> Result<(), vfs::Error> {
@@ -355,29 +359,38 @@ impl Inode {
             .short
             .access(|short| rename_dirents(short, new_name));
 
-        if let Some(new_parent) = new_parent {
-            // Rename to another directory
-            debug_assert_eq!(new_parent.ty, DirEntryType::Directory);
+        {
+            let dest_parent = new_parent
+                .as_deref_mut()
+                .inspect(|p| debug_assert_eq!(p.ty, DirEntryType::Directory))
+                .unwrap_or_else(|| {
+                    debug_assert_ne!(old_name, new_name);
+                    self
+                });
 
-            if let Some(dest) = new_parent.find_cwd(new_name, sb) {
+            if let Some(dest) = dest_parent.find_cwd(new_name, sb) {
+                // new_name的文件已存在
                 match (src.ty, dest.ty) {
                     (DirEntryType::Directory, DirEntryType::Directory) => {
                         // 对于非空的目录，删除失败就退出
-                        new_parent.rmdir(new_name, sb)?;
-                        self.remove(src.range, sb);
-                        new_parent.create(new_name, short, new_longs, sb)?;
+                        dest_parent.rmdir(new_name, sb)?;
                     }
                     (_, DirEntryType::Directory) => return Err(vfs::Error::IsADirectory),
                     (DirEntryType::Directory, _) => return Err(vfs::Error::NotADirectory),
-                    _ => todo!(),
+                    _ => {
+                        // 普通文件的覆盖
+                        dest_parent.unlink(new_name, sb)?;
+                    }
                 }
             }
-        } else {
-            // Rename currently
-            debug_assert_ne!(old_name, new_name);
-            self.remove(src.range, sb);
-            self.create(new_name, short, new_longs, sb)?;
         }
+
+        self.remove(src.range, sb);
+        new_parent
+            .unwrap_or(self)
+            .create(new_name, short, new_longs, sb)?;
+
+        sector::sync_all();
 
         Ok(())
     }
@@ -694,7 +707,7 @@ impl Inode {
             head_pos = Some(pos);
             pos.access(|dirent: &ShortDirEntry| {
                 if dirent.is_relative() {
-                    DirEntryStatus::TailFree
+                    DirEntryStatus::Free
                 } else {
                     dirent.status()
                 }
@@ -709,7 +722,7 @@ impl Inode {
                 DirEntryStatus::Free | DirEntryStatus::Occupied,
                 DirEntryStatus::Free | DirEntryStatus::Occupied,
             ) => range.clear(&FREE),
-            /* TF + Any */
+            /* TF + Any 。从有到无时，前面的目录项不可为尾自由项 */
             (DirEntryStatus::TailFree, _) => unreachable!(),
             /* Free + TF */
             (DirEntryStatus::Free, DirEntryStatus::TailFree) => {

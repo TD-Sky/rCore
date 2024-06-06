@@ -202,6 +202,7 @@ pub fn sys_rename(oldpath: *const u8, newpath: *const u8) -> isize {
     let Some(newpath) = memory::read_str(token, newpath).canonicalize(&process.cwd) else {
         return -1;
     };
+    log::debug!("{oldpath} -> {newpath}");
     drop(process);
     if newpath.starts_with(&oldpath) {
         // 不可以将父目录移到下属的子目录；或两路径不能相同

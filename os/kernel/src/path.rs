@@ -63,7 +63,7 @@ impl Path for str {
             cmps.extend(cwd.split('/').filter(|s| !s.is_empty()));
         }
 
-        for cmp in self.trim_start_matches('/').split('/') {
+        for cmp in self.trim_matches('/').split('/') {
             match cmp {
                 ".." => {
                     cmps.pop()?;
@@ -73,9 +73,13 @@ impl Path for str {
                 s => cmps.push(s),
             }
         }
-        cmps.insert(0, ""); // 在接下来的拼接中代表根目录
 
-        Some(cmps.join("/"))
+        if cmps.is_empty() {
+            Some("/".into())
+        } else {
+            cmps.insert(0, ""); // 在接下来的拼接中代表根目录
+            Some(cmps.join("/"))
+        }
     }
 
     fn root_relative(&self) -> Option<&Self> {
