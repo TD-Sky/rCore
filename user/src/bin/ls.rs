@@ -5,8 +5,10 @@
 extern crate alloc;
 
 use alloc::borrow::ToOwned;
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::fmt::Write;
 
 use user::fs::{close, getdents, open, OpenFlag};
 use user::println;
@@ -43,8 +45,17 @@ fn main(_: usize, argv: &[&str]) -> i32 {
     }
 
     close(fd).unwrap();
-    let s = names.join("\n");
-    println!("{s}");
+
+    let Some(max_len) = names.iter().map(String::len).max() else {
+        return 0;
+    };
+    let mut buf = String::with_capacity(max_len * names.len());
+    for (i, name) in names.iter().enumerate() {
+        write!(buf, "{name:<max_len$}").unwrap();
+        let sep = if (i + 1) % 5 == 0 { '\n' } else { ' ' };
+        buf.push(sep);
+    }
+    println!("{}", buf.trim_end());
 
     0
 }

@@ -1,7 +1,7 @@
 use crate::DirEntryType;
 
 #[derive(Debug)]
-#[repr(C, align(32))]
+#[repr(C)]
 pub struct Stat {
     pub mode: DirEntryType,
     /// Optimal I/O block size

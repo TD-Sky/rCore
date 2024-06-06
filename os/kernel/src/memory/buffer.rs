@@ -1,4 +1,5 @@
 use core::mem::{self, MaybeUninit};
+use core::{ptr, slice};
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -95,5 +96,14 @@ impl AsRef<[&'static mut [u8]]> for UserBuffer {
 impl AsMut<[&'static mut [u8]]> for UserBuffer {
     fn as_mut(&mut self) -> &mut [&'static mut [u8]] {
         self.bufs.as_mut_slice()
+    }
+}
+
+pub fn write_any<T: 'static>(token: usize, ptr: *mut T, value: T) {
+    let mut buffer = UserBuffer::new(token, ptr.cast(), mem::size_of::<T>());
+    let bytes =
+        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast::<u8>(), mem::size_of::<T>()) };
+    for (b, &vb) in buffer.iter_mut().zip(bytes) {
+        *b = vb;
     }
 }

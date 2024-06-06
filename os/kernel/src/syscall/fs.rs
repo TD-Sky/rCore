@@ -181,7 +181,7 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
 
     match fd_table[fd].as_ref().map(|file| file.stat()) {
         Some(stat) => {
-            *memory::read_mut(inner.user_token(), st) = stat;
+            memory::write_any(inner.user_token(), st, stat);
             0
         }
         None => {

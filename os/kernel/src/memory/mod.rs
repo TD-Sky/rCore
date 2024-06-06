@@ -8,7 +8,7 @@ mod page_table;
 
 pub use self::{
     address_space::{AddressSpace, MapPermission, KERNEL_SPACE},
-    buffer::UserBuffer,
+    buffer::{write_any, UserBuffer},
     kernel_stack::{alloc_kernel_stack, kernel_token, KernelStack},
     page_table::{read_mut, read_ref, read_str, write_str, PageTable},
 };
