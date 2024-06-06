@@ -1,19 +1,6 @@
 use core::num::{NonZero, NonZeroU16, NonZeroU32, NonZeroU8};
 
-use spin::once::Once;
-
 use crate::SectorId;
-
-static BPB: Once<Bpb> = Once::new();
-
-pub fn init_bpb(bpb: Bpb) {
-    BPB.call_once(|| bpb);
-}
-
-#[inline]
-pub fn bpb() -> &'static Bpb {
-    unsafe { BPB.get_unchecked() }
-}
 
 /// BIOS Parameter Block BIOS参数块
 /// 位于保留区的第一扇区，该扇区又名启动扇区。

@@ -1,7 +1,7 @@
 use core::mem;
 use core::ops::Range;
 
-use crate::volume::reserved::{self, bpb, Bpb};
+use crate::volume::reserved::{self, Bpb, Media};
 use crate::{sector, SectorId};
 use crate::{ClusterError, ClusterId};
 
@@ -9,6 +9,9 @@ use crate::{ClusterError, ClusterId};
 #[derive(Debug)]
 pub struct Fat {
     range: Range<SectorId>,
+    media: Media,
+    /// 一个扇区能容纳多少条簇编号
+    sector_cids: usize,
 }
 
 impl Fat {
@@ -18,6 +21,8 @@ impl Fat {
 
         Self {
             range: Range { start, end },
+            media: bpb.media,
+            sector_cids: bpb.sector_bytes() / mem::size_of::<u32>(),
         }
     }
 
@@ -54,7 +59,7 @@ impl Fat {
         sector::get(self.range.start)
             .lock()
             .map_mut_slice(|cids: &mut [ClusterId<u32>]| {
-                cids[0] = ClusterId::new(0xFF_FF_FF_00 + bpb().media as u32);
+                cids[0] = ClusterId::new(0xFF_FF_FF_00 + self.media as u32);
                 // WARN: 标准中要求FAT[1]除了标志位，其它均设为1，
                 //       而`ClusterId::new`内部会进行一次掩码，应该没关系？
                 cids[1] = ClusterId::new((Self::SET_CLN_SHUT + Self::SET_HRD_ERR) | u32::MAX);
@@ -71,8 +76,6 @@ impl Fat {
     ///
     /// [`FatFileSystem::alloc_cluster`]: crate::FatFileSystem::alloc_cluster
     pub fn alloc(&mut self) -> Option<ClusterId<u32>> {
-        let sector_clusters = Self::sector_clusters();
-
         for (i, sid) in self.range.clone().enumerate() {
             if let Some(cidx) =
                 sector::get(sid)
@@ -89,7 +92,7 @@ impl Fat {
                     })
             {
                 reserved::record_alloc();
-                return Some(ClusterId::from(i * sector_clusters + cidx));
+                return Some(ClusterId::from(i * self.sector_cids + cidx));
             }
         }
 
@@ -129,14 +132,9 @@ impl Fat {
     const SET_CLN_SHUT: u32 = 0x08000000;
     const SET_HRD_ERR: u32 = 0x04000000;
 
-    /// 一个扇区能容纳多少条簇编号
-    fn sector_clusters() -> usize {
-        bpb().sector_bytes() / mem::size_of::<u32>()
-    }
-
     /// 获取`id`所在扇区
     fn get_sector(&self, id: ClusterId<u32>) -> SectorId {
-        let sector_index = usize::from(id) / Self::sector_clusters();
+        let sector_index = usize::from(id) / self.sector_cids;
         self.range.start + sector_index
     }
 
@@ -153,7 +151,7 @@ impl Fat {
     fn id2pos(&self, id: ClusterId<u32>) -> ClusterIdPos {
         ClusterIdPos {
             sector: self.get_sector(id),
-            nth: u32::from(id) as usize % Self::sector_clusters(),
+            nth: u32::from(id) as usize % self.sector_cids,
         }
     }
 }

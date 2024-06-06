@@ -10,7 +10,7 @@ use core::mem;
 
 use enumflags2::{bitflags, BitFlags};
 
-use crate::{volume::reserved::bpb, ClusterId};
+use crate::{sector, ClusterId};
 
 static CWD_NAME: [u8; 11] = {
     let mut arr = [0; 11];
@@ -372,5 +372,5 @@ pub fn rename_dirents(short: &ShortDirEntry, new_name: &str) -> (ShortDirEntry, 
 }
 
 pub fn sector_dirents() -> usize {
-    bpb().sector_bytes() / mem::size_of::<ShortDirEntry>()
+    sector::size() / mem::size_of::<ShortDirEntry>()
 }

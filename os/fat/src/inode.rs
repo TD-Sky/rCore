@@ -4,7 +4,6 @@ use core::mem;
 use vfs::{DirEntryType, Stat};
 
 use crate::volume::data::*;
-use crate::volume::reserved::bpb;
 use crate::{sector, ClusterId, FatFileSystem, SectorId};
 
 pub static ROOT: Inode = Inode {
@@ -60,7 +59,7 @@ impl Inode {
         debug_assert_eq!(self.ty, DirEntryType::Regular);
 
         let file_size = self.range.short.access(ShortDirEntry::size);
-        let sector_size = bpb().sector_bytes();
+        let sector_size = sector::size();
 
         let start = offset;
         let end = (start + buf.len()).min(file_size); // exclusive
@@ -110,7 +109,7 @@ impl Inode {
         debug_assert_eq!(self.ty, DirEntryType::Regular);
 
         let file_size = self.range.short.access(ShortDirEntry::size);
-        let sector_size = bpb().sector_bytes();
+        let sector_size = sector::size();
 
         let start = offset;
         let end = start + buf.len(); // exclusive
@@ -120,7 +119,7 @@ impl Inode {
             let added_sectors = (end - file_size).div_ceil(sector_size);
             debug_assert!(added_sectors > 0);
 
-            let mut added_clusters = added_sectors.div_ceil(bpb().cluster_sectors());
+            let mut added_clusters = added_sectors.div_ceil(sb.data().cluster_sectors());
 
             let mut current = if self.start_id == ClusterId::FREE {
                 /* 空文件 */
@@ -297,7 +296,7 @@ impl Inode {
     pub fn stat(&self, sb: &FatFileSystem) -> Stat {
         Stat {
             mode: self.ty,
-            block_size: bpb().sector_bytes() as u64,
+            block_size: sector::size() as u64,
             blocks: sb.data_sectors(self.start_id).count() as u64,
             size: self.range.short.access(ShortDirEntry::size) as u64,
         }

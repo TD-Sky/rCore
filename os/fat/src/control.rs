@@ -1,5 +1,6 @@
+use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
-use alloc::{sync::Arc, vec};
 use core::iter::Iterator;
 use core::mem;
 use core::ops::Range;
@@ -9,7 +10,7 @@ use block_dev::BlockDevice;
 use crate::volume::{
     data::DataArea,
     fat::Fat,
-    reserved::{bpb, init_bpb, Bpb, FsInfo},
+    reserved::{Bpb, FsInfo},
 };
 use crate::{sector, ClusterId, SectorId};
 
@@ -29,38 +30,29 @@ impl FatFileSystem {
             unsafe { mem::transmute(buf) }
         };
 
-        sector::init_cache(dev);
+        sector::init_cache(&bpb, dev);
 
-        let fs = FatFileSystem {
+        FatFileSystem {
             fat: Fat::new(&bpb),
             data_area: DataArea::new(&bpb),
-        };
-        init_bpb(bpb);
-        fs
+        }
     }
 
-    pub fn new(disk_size: usize) -> Self {
+    pub fn foramt(disk_size: usize, dev: &Arc<dyn BlockDevice>) -> Self {
         let bpb = Bpb::new(disk_size);
-        let fs = FatFileSystem {
-            fat: Fat::new(&bpb),
-            data_area: DataArea::new(&bpb),
-        };
-        init_bpb(bpb);
-        fs
-    }
+        let mut fat = Fat::new(&bpb);
+        let data_area = DataArea::new(&bpb);
 
-    pub fn foramt(&mut self, dev: &Arc<dyn BlockDevice>) {
-        sector::init_cache(dev);
+        sector::init_cache(&bpb, dev);
 
-        let bpb = bpb();
         sector::get(SectorId::new(0))
             .lock()
-            .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(bpb));
+            .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(&bpb));
         sector::get(bpb.backup_boot())
             .lock()
-            .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(bpb));
+            .map_mut(0, |disk_bpb: &mut Bpb| disk_bpb.clone_from(&bpb));
 
-        let fs_info = FsInfo::new(bpb);
+        let fs_info = FsInfo::new(&bpb);
         sector::get(bpb.fs_info())
             .lock()
             .map_mut(0, |disk_fs_info: &mut FsInfo| {
@@ -70,15 +62,20 @@ impl FatFileSystem {
             .lock()
             .map_mut(0, |disk_fs_info: &mut FsInfo| *disk_fs_info = fs_info);
 
-        for sid in self.fat.range() {
+        for sid in fat.range() {
             sector::get(sid)
                 .lock()
                 .map_mut_slice(|cids: &mut [ClusterId<u32>]| cids.fill(ClusterId::FREE));
         }
 
-        self.fat.alloc_root();
+        fat.alloc_root();
+        data_area.cluster(ClusterId::MIN).unwrap().for_each(|sid| {
+            sector::get(sid).lock().zeroize();
+        });
 
         sector::sync_all();
+
+        Self { fat, data_area }
     }
 
     pub const fn fat(&self) -> &Fat {
@@ -205,7 +202,7 @@ impl<'a> SectorCursor<'a> {
                 .data_area
                 .cluster(self.clusters[prev_ci])
                 .unwrap();
-            *sindex = bpb().cluster_sectors() - 1;
+            *sindex = self.control.data().cluster_sectors() - 1;
             *sid = sids.clone().nth(*sindex).expect("nth has been checked");
 
             Some(self)

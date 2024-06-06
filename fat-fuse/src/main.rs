@@ -28,8 +28,7 @@ fn main() -> io::Result<()> {
     fd.set_len(disk_size)?;
 
     let block_dev: Arc<dyn BlockDevice> = Arc::new(BlockFile::new(fd));
-    let mut fs = FatFileSystem::new(disk_size as usize);
-    fs.foramt(&block_dev);
+    let mut fs = FatFileSystem::foramt(disk_size as usize, &block_dev);
 
     let usr_bin = ROOT
         .mkdir("usr", &mut fs)
@@ -55,7 +54,7 @@ fn main() -> io::Result<()> {
         let mut elf_data: Vec<u8> = Vec::new();
         host_file.read_to_end(&mut elf_data)?;
 
-        let mut inode = usr_bin.touch(&app, &mut fs).unwrap();
+        let mut inode = usr_bin.create_file(&app, &mut fs).unwrap();
         inode.write_at(0, &elf_data, &mut fs);
     }
 

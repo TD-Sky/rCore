@@ -7,7 +7,7 @@ mod cluster;
 mod control;
 mod inode;
 mod sector;
-pub mod volume;
+mod volume;
 
 pub use self::{
     cluster::{ClusterError, ClusterId},
