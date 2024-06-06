@@ -170,22 +170,17 @@ pub fn sys_rmdir(path: *const u8) -> isize {
 }
 
 pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
-    let process = processor::current_process();
-    let inner = process.inner().exclusive_access();
-    let fd_table = &inner.fd_table;
+    let (file, token) = processor::current_process()
+        .inner()
+        .exclusive_session(|inner| (inner.fd_table.try_get(fd), inner.user_token()));
 
-    if fd >= fd_table.len() {
-        log::error!("fd={fd} is outbound");
-        return -1;
-    }
-
-    match fd_table[fd].as_ref().map(|file| file.stat()) {
+    match file.map(|file| file.stat()) {
         Some(stat) => {
-            memory::write_any(inner.user_token(), st, stat);
+            memory::write_any(token, st, stat);
             0
         }
         None => {
-            log::error!("no such file: fd={fd}");
+            log::error!("invalid fd={fd}");
             -1
         }
     }

@@ -60,6 +60,10 @@ where
     pub fn get(&self, index: usize) -> T {
         self.0[index].clone().unwrap()
     }
+
+    pub fn try_get(&self, index: usize) -> Option<T> {
+        self.0.get(index).and_then(|v| v.clone())
+    }
 }
 
 impl<T> Deref for SlotVec<T> {
