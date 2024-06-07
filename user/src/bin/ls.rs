@@ -16,7 +16,7 @@ use vfs::{CDirEntry, DirEntryType};
 
 #[no_mangle]
 fn main(_: usize, argv: &[&str]) -> i32 {
-    let path = argv.get(1).copied().unwrap_or("/");
+    let path = argv.get(1).copied().unwrap_or(".");
 
     let mut names = Vec::new();
     let fd = open(path, OpenFlag::read_only()).expect("Not found");

@@ -22,7 +22,7 @@ impl<T> UpCell<T> {
         }
     }
 
-    /// Panic if the data has been borrowed.
+    /// WARN: 对于全体类型，同时只能有一个[`UpCell`]发生借用。
     pub fn exclusive_access(&self) -> UpRefMut<'_, T> {
         INTERRUPT_GUARD.get_mut().enter();
         UpRefMut(Some(self.inner.borrow_mut()))

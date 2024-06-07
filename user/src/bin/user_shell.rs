@@ -21,13 +21,12 @@ const CR: u8 = 0x0d;
 /// backspace
 const DL: u8 = 0x7f;
 const BS: u8 = 0x08;
-const LINE_START: &str = ">> ";
 
 #[no_mangle]
 fn main() -> i32 {
     println!("Rust user shell");
     let mut line = String::new();
-    print!("{LINE_START}");
+    print!("{}#", getcwd());
 
     loop {
         let c = getchar();
@@ -37,12 +36,22 @@ fn main() -> i32 {
                 println!("");
 
                 'block: {
+                    let line = line.trim();
+
                     if line.is_empty() {
+                        break 'block;
+                    } else if line.starts_with("cd ") {
+                        let Some(dir) = line.split_whitespace().nth(1) else {
+                            println!("cd: missing path");
+                            break 'block;
+                        };
+                        if chdir(dir).is_none() {
+                            println!("`cd` failed");
+                        }
                         break 'block;
                     }
 
-                    let process_args_list: Vec<_> =
-                        line.as_str().split('|').map(ProcessArgs::new).collect();
+                    let process_args_list: Vec<_> = line.split('|').map(ProcessArgs::new).collect();
 
                     if !commands_are_valid(&process_args_list) {
                         println!("Invalid command(s): Input/Output cannot be correctly binded!");
@@ -88,13 +97,12 @@ fn main() -> i32 {
                     for pid in children {
                         let exit_pid = waitpid(pid, &mut exit_code);
                         assert_eq!(exit_pid, Some(pid));
-                        println!("Shell: Process {} exited with code {}", pid, exit_code);
+                        println!("Shell: Process {pid} exited with code {exit_code}");
                     }
-
-                    line.clear();
                 }
 
-                print!("{LINE_START}");
+                line.clear();
+                print!("{}#", getcwd());
             }
             BS | DL => {
                 if !line.is_empty() {
@@ -125,8 +133,8 @@ struct ProcessArgs {
 }
 
 impl ProcessArgs {
-    fn new(command: &str) -> Self {
-        let mut args: Vec<String> = command
+    fn new(cmd_args: &str) -> Self {
+        let mut args: Vec<String> = cmd_args
             .split_whitespace()
             .filter(|arg| !arg.is_empty())
             .map(String::from)

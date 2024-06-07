@@ -45,7 +45,7 @@ pub struct ProcessControlBlockInner {
     pub mutex_list: SlotVec<Arc<dyn Mutex>>,
     pub semaphore_list: SlotVec<Arc<Semaphore>>,
     pub condvar_list: SlotVec<Arc<Condvar>>,
-    pub cwd: String,
+    pub cwd: Arc<str>,
 }
 
 impl ProcessControlBlock {
@@ -79,7 +79,7 @@ impl ProcessControlBlock {
                     mutex_list: SlotVec::new(),
                     semaphore_list: SlotVec::new(),
                     condvar_list: SlotVec::new(),
-                    cwd: String::from("/"),
+                    cwd: Arc::from("/"),
                 })
             },
         });

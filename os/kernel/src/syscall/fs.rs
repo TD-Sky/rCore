@@ -62,14 +62,18 @@ pub fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
 }
 
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let token = processor::current_user_token();
-    let path = memory::read_str(token, path);
+    let process = processor::current_process();
+    let (cwd, token) = process
+        .inner()
+        .exclusive_session(|process| (process.cwd.clone(), process.user_token()));
 
+    let Some(path) = memory::read_str(token, path).canonicalize(&cwd) else {
+        return -1;
+    };
     let Some(inode) = fs::open(&path, BitFlags::from_bits(flags).unwrap()) else {
         return -1;
     };
 
-    let process = processor::current_process();
     let mut process = process.inner().exclusive_access();
     process.fd_table.insert(inode) as isize
 }
@@ -300,20 +304,21 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
 
 pub fn sys_chdir(path: *const u8) -> isize {
     let process = processor::current_process();
-    let mut process = process.inner().exclusive_access();
+    let (cwd, token) = process
+        .inner()
+        .exclusive_session(|process| (process.cwd.clone(), process.user_token()));
 
-    let token = process.user_token();
-    let Some(path) = memory::read_str(token, path).canonicalize(&process.cwd) else {
+    let Some(path) = memory::read_str(token, path).canonicalize(&cwd) else {
         return -1;
     };
-    if path == process.cwd {
+    if path == cwd.as_ref() {
         return 0;
     }
     if fs::open_dir(&path).is_err() {
         return -1;
     }
 
-    process.cwd = path;
+    process.inner().exclusive_access().cwd = path.into();
 
     0
 }
