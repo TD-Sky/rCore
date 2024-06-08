@@ -22,11 +22,15 @@ const CR: u8 = 0x0d;
 const DL: u8 = 0x7f;
 const BS: u8 = 0x08;
 
+fn line_start() {
+    print!("{}# ", getcwd());
+}
+
 #[no_mangle]
 fn main() -> i32 {
     println!("Rust user shell");
     let mut line = String::new();
-    print!("{}#", getcwd());
+    line_start();
 
     loop {
         let c = getchar();
@@ -97,12 +101,14 @@ fn main() -> i32 {
                     for pid in children {
                         let exit_pid = waitpid(pid, &mut exit_code);
                         assert_eq!(exit_pid, Some(pid));
-                        println!("Shell: Process {pid} exited with code {exit_code}");
+                        if exit_code != 0 {
+                            println!("Shell: Process {pid} exited with code {exit_code}");
+                        }
                     }
                 }
 
                 line.clear();
-                print!("{}#", getcwd());
+                line_start();
             }
             BS | DL => {
                 if !line.is_empty() {
