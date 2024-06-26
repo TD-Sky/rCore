@@ -56,6 +56,7 @@ pub struct StackFrameAllocator {
 }
 
 /// 实际上是一个独占指针
+#[derive(Debug)]
 pub struct Frame {
     pub ppn: PhysPageNum,
 }

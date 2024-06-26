@@ -18,14 +18,17 @@ use crate::trap::{trap_handler, TrapContext};
 
 static PID_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 
+#[derive(Debug)]
 pub struct ProcessControlBlock {
     pid: PidHandle,
     inner: UpCell<ProcessControlBlockInner>,
 }
 
 /// 进程描述符
+#[derive(Debug)]
 pub struct PidHandle(usize);
 
+#[derive(Debug)]
 pub struct ProcessControlBlockInner {
     pub is_zombie: bool,
     pub address_space: AddressSpace,
@@ -42,6 +45,7 @@ pub struct ProcessControlBlockInner {
     pub mutex_list: SlotVec<Arc<dyn Mutex>>,
     pub semaphore_list: SlotVec<Arc<Semaphore>>,
     pub condvar_list: SlotVec<Arc<Condvar>>,
+    pub cwd: Arc<str>,
 }
 
 impl ProcessControlBlock {
@@ -75,6 +79,7 @@ impl ProcessControlBlock {
                     mutex_list: SlotVec::new(),
                     semaphore_list: SlotVec::new(),
                     condvar_list: SlotVec::new(),
+                    cwd: Arc::from("/"),
                 })
             },
         });
@@ -122,6 +127,7 @@ impl ProcessControlBlock {
                     mutex_list: SlotVec::new(),
                     semaphore_list: SlotVec::new(),
                     condvar_list: SlotVec::new(),
+                    cwd: parent_inner.cwd.clone(),
                 })
             },
         });

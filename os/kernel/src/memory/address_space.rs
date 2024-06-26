@@ -156,12 +156,13 @@ pub static KERNEL_SPACE: Lazy<UpCell<AddressSpace>> =
     Lazy::new(|| UpCell::new(AddressSpace::new_kernel()));
 
 /// 地址空间由一系列有关联但不一定连续的逻辑段组成
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AddressSpace {
     page_table: PageTable,
     logic_segments: Vec<LogicSegment>,
 }
 
+#[derive(Debug)]
 struct LogicSegment {
     vpn_range: Range<VirtPageNum>,
     vpn2frame: BTreeMap<VirtPageNum, Frame>,

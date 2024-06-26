@@ -8,6 +8,7 @@
 #![feature(riscv_ext_intrinsics)]
 #![feature(let_chains)]
 #![feature(const_binary_heap_constructor)]
+#![feature(maybe_uninit_as_bytes)]
 
 extern crate alloc;
 
@@ -21,6 +22,7 @@ mod fs;
 mod lang_items;
 mod logging;
 mod memory;
+mod path;
 mod ptr;
 mod sbi;
 mod stack_trace;

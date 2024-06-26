@@ -1,25 +1,20 @@
-use easy_fs::Stat;
-
 use super::File;
 use crate::memory::UserBuffer;
 use crate::sbi::console_getchar;
 use crate::task;
 
 /// 标准输入
+#[derive(Debug)]
 pub struct Stdin;
 
 /// 标准输出
+#[derive(Debug)]
 pub struct Stdout;
 
 impl File for Stdin {
     #[inline]
     fn readable(&self) -> bool {
         true
-    }
-
-    #[inline]
-    fn writable(&self) -> bool {
-        false
     }
 
     fn read(&self, mut buf: UserBuffer) -> usize {
@@ -40,30 +35,12 @@ impl File for Stdin {
         }
         1
     }
-
-    fn write(&self, _buf: UserBuffer) -> usize {
-        unimplemented!()
-    }
-
-    fn stat(&self) -> Stat {
-        unimplemented!()
-    }
 }
 
 impl File for Stdout {
     #[inline]
-    fn readable(&self) -> bool {
-        false
-    }
-
-    #[inline]
     fn writable(&self) -> bool {
         true
-    }
-
-    #[inline]
-    fn read(&self, _buf: UserBuffer) -> usize {
-        unimplemented!()
     }
 
     fn write(&self, buf: UserBuffer) -> usize {
@@ -71,10 +48,5 @@ impl File for Stdout {
             print!("{}", core::str::from_utf8(sub_buf).unwrap());
         }
         buf.len()
-    }
-
-    #[inline]
-    fn stat(&self) -> Stat {
-        unimplemented!()
     }
 }

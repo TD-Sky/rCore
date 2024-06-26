@@ -1,7 +1,8 @@
 use alloc::ffi::CString;
+use alloc::format;
 use alloc::vec::Vec;
+use core::ptr;
 
-use crate::status2option;
 use crate::syscall::*;
 use crate::thread::yield_;
 
@@ -20,17 +21,20 @@ where
     S: AsRef<str>,
     I: IntoIterator<Item = S>,
 {
+    let path = if !path.starts_with('/') {
+        &format!("/usr/bin/{path}")
+    } else {
+        path
+    };
+
     let path = CString::new(path).unwrap();
     let args = args
         .into_iter()
         .map(|s| CString::new(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    let args: Vec<_> = args
-        .iter()
-        .map(|s| s.as_c_str().as_ptr())
-        .chain([c"".as_ptr()])
-        .collect();
+    let mut args: Vec<_> = args.iter().map(|s| s.as_c_str().as_ptr()).collect();
+    args.push(ptr::null());
     match sys_exec(&path, &args) {
         -1 => None,
         _ => unreachable!(),
@@ -38,8 +42,8 @@ where
 }
 
 pub fn spawn(path: &str) -> Option<usize> {
-    let path = CString::new(path).unwrap();
-    status2option(sys_spawn(&path))
+    let path = CString::new(path).ok()?;
+    sys_spawn(&path).status()
 }
 
 /// 等待任意一个子进程结束

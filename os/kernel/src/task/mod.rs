@@ -26,7 +26,7 @@ use spin::Lazy;
 use enumflags2::BitFlags;
 
 use self::signal::SignalFlag;
-use crate::fs::open_file;
+use crate::fs::open;
 use crate::fs::OpenFlag;
 use crate::sbi::shutdown;
 
@@ -34,9 +34,12 @@ const IDLE_PID: usize = 0;
 
 static INITPROC: Lazy<Arc<ProcessControlBlock>> = Lazy::new(|| {
     ProcessControlBlock::new(
-        &open_file("initproc", BitFlags::from_bits_truncate(OpenFlag::RDONLY))
-            .unwrap()
-            .read_all(),
+        &open(
+            "/usr/bin/initproc",
+            BitFlags::from_bits_truncate(OpenFlag::RDONLY),
+        )
+        .unwrap()
+        .read_all(),
     )
 });
 

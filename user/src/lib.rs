@@ -25,8 +25,8 @@ use alloc::vec::Vec;
 use buddy_system_allocator::LockedHeap;
 use core::slice;
 
-/// 16KB 的堆空间
-const USER_HEAP_SIZE: usize = 0x4000;
+/// 分配的堆空间
+const USER_HEAP_SIZE: usize = 2usize.pow(20);
 
 static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
@@ -41,11 +41,10 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
             .init(HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
     }
 
+    let argv = argv as *const usize;
     let argv: Vec<_> = (0..argc)
         .map(|i| {
-            let ptr = unsafe {
-                ((argv + i * core::mem::size_of::<usize>()) as *const usize).read_volatile()
-            } as *const u8;
+            let ptr = unsafe { argv.add(i).read_volatile() } as *const u8;
             let len = (0..)
                 .find(|&i| unsafe { ptr.add(i).read_volatile() == b'\0' })
                 .unwrap();
@@ -62,9 +61,4 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
 #[linkage = "weak"]
 fn main(_argc: usize, _argv: &[&str]) -> i32 {
     panic!("Cannot find main!");
-}
-
-#[inline]
-fn status2option(status: isize) -> Option<usize> {
-    (status >= 0).then_some(status as usize)
 }

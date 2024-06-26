@@ -1,40 +1,44 @@
 use core::arch::asm;
 use core::ffi::{c_char, CStr};
-use core::ptr;
 
-use easy_fs::{DirEntry, Stat};
+use vfs::{CDirEntry, Stat};
 
 use crate::signal::SignalAction;
 
-const DUP: usize = 24;
-const UNLINKAT: usize = 35;
-const LINKAT: usize = 37;
-const OPEN: usize = 56;
-const CLOSE: usize = 57;
-const PIPE: usize = 59;
-const GETDENTS: usize = 61;
-const READ: usize = 63;
-const WRITE: usize = 64;
-const FSTAT: usize = 80;
-const EXIT: usize = 93;
+const READ: usize = 0;
+const WRITE: usize = 1;
+const OPEN: usize = 2;
+const CLOSE: usize = 3;
+const FSTAT: usize = 5;
+const PIPE: usize = 22;
+const DUP: usize = 32;
+const GETPID: usize = 39;
+const FORK: usize = 57;
+const EXIT: usize = 60;
+const KILL: usize = 62;
+const GETDENTS: usize = 78;
+const GETCWD: usize = 79;
+const CHDIR: usize = 80;
+const RENAME: usize = 82;
+const MKDIR: usize = 83;
+const RMDIR: usize = 84;
+const LINK: usize = 86;
+const UNLINK: usize = 87;
 const SLEEP: usize = 101;
 const YIELD: usize = 124;
 const SIGACTION: usize = 134;
 const SIGPROCMASK: usize = 135;
 const SIGRETURN: usize = 139;
-const TIME: usize = 169;
-const GETPID: usize = 172;
+const GET_TIME: usize = 169;
+const GETTID: usize = 186;
 const SBRK: usize = 214;
-const KILL: usize = 219;
 const MUNMAP: usize = 215;
-const FORK: usize = 220;
 const EXEC: usize = 221;
 const MMAP: usize = 222;
 const WAITPID: usize = 260;
 const EVENTFD: usize = 290;
 const SPAWN: usize = 400;
 const SPAWN_THREAD: usize = 1000;
-const GETTID: usize = 1001;
 const WAITTID: usize = 1002;
 const MUTEX_CREATE: usize = 1010;
 const MUTEX_LOCK: usize = 1011;
@@ -49,6 +53,21 @@ const FRAMEBUFFER: usize = 2000;
 const FRAMEBUFFER_FLUSH: usize = 2001;
 const GET_EVENT: usize = 3000;
 const KEY_PRESSED: usize = 3001;
+
+pub(crate) trait Status: Sized {
+    fn status(self) -> Option<usize>;
+    fn some(self) -> Option<()>;
+}
+
+impl Status for isize {
+    fn status(self) -> Option<usize> {
+        (self >= 0).then_some(self as usize)
+    }
+
+    fn some(self) -> Option<()> {
+        (self == 0).then_some(())
+    }
+}
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret;
@@ -89,7 +108,7 @@ pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
 ///
 /// UB
 /// 若读取的不是目录，则可能发生未定义行为
-pub fn sys_getdents(fd: usize, dents: &mut [DirEntry]) -> isize {
+pub fn sys_getdents(fd: usize, dents: &mut [CDirEntry]) -> isize {
     syscall(GETDENTS, [fd, dents.as_mut_ptr() as usize, dents.len()])
 }
 
@@ -107,7 +126,7 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_get_time() -> isize {
-    syscall(TIME, [0, 0, 0])
+    syscall(GET_TIME, [0, 0, 0])
 }
 
 pub fn sys_sbrk(size: i32) -> isize {
@@ -159,27 +178,59 @@ pub fn sys_spawn(path: &CStr) -> isize {
     syscall(SPAWN, [path.as_ptr() as usize, 0, 0])
 }
 
-pub fn sys_linkat(oldpath: &CStr, newpath: &CStr) -> isize {
+pub fn sys_link(oldpath: &CStr, newpath: &CStr) -> isize {
     syscall(
-        LINKAT,
+        LINK,
         [oldpath.as_ptr() as usize, newpath.as_ptr() as usize, 0],
     )
 }
 
-pub fn sys_unlinkat(path: &CStr) -> isize {
-    syscall(UNLINKAT, [path.as_ptr() as usize, 0, 0])
+pub fn sys_unlink(path: &CStr) -> isize {
+    syscall(UNLINK, [path.as_ptr() as usize, 0, 0])
 }
 
-pub fn sys_fstat(fd: usize, st: &mut Stat) -> isize {
-    syscall(FSTAT, [fd, ptr::from_mut(st) as usize, 0])
+pub fn sys_chdir(path: &CStr) -> isize {
+    syscall(CHDIR, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_mkdir(path: &CStr) -> isize {
+    syscall(MKDIR, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_rmdir(path: &CStr) -> isize {
+    syscall(RMDIR, [path.as_ptr() as usize, 0, 0])
+}
+
+/// 将当前进程所在目录的绝对路径写入缓冲区
+///
+/// # 结果
+///
+/// * >0 => 实际的路径长度
+/// * <0 => 负·实际的路径长度
+/// * =0 => unreachable
+pub fn sys_getcwd(buf: &mut [u8], len: usize) -> isize {
+    syscall(GETCWD, [buf.as_mut_ptr() as usize, len, 0])
+}
+
+pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
+    syscall(FSTAT, [fd, st as usize, 0])
+}
+
+pub fn sys_rename(oldpath: &CStr, newpath: &CStr) -> isize {
+    syscall(
+        RENAME,
+        [oldpath.as_ptr() as usize, newpath.as_ptr() as usize, 0],
+    )
 }
 
 /// 将进程中一个已经打开的文件复制一份并分配到一个新的文件描述符中
 ///
-/// 参数
+/// # 参数
+///
 /// * fd: 已打开文件的描述符
 ///
-/// 结果
+/// # 结果
+///
 /// * -1 => 出现错误，可能是`fd`无效
 /// * new_fd => 文件副本的描述符
 pub fn sys_dup(fd: usize) -> isize {

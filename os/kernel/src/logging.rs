@@ -24,10 +24,11 @@ impl Log for Logger {
         };
 
         println!(
-            "\u{1B}[{}m[{:<5}] [kernel] {}\u{1B}[0m",
-            color,
-            record.level(),
-            record.args()
+            "\u{1B}[{color}m[{level:<5}] {target}:{line} {args}\u{1B}[0m",
+            level = record.level(),
+            target = record.target(),
+            line = record.line().unwrap(),
+            args = record.args()
         );
     }
 

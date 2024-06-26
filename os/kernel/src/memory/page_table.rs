@@ -12,6 +12,7 @@ use super::frame_allocator::Frame;
 use enumflags2::bitflags;
 use enumflags2::BitFlags;
 
+#[derive(Debug)]
 pub struct PageTable {
     /// 一级页表的物理地址，要交给satp
     root: PhysPageNum,
@@ -176,11 +177,13 @@ impl PageTable {
         Some(&mut ppn.ptes_mut()[indexes[2]])
     }
 
+    /// 要求：`T`不能跨页存储
     #[inline]
     fn read_ref<T>(&self, va: VirtAddr) -> &'static T {
         self.translate_virt_addr(va).unwrap().as_ref()
     }
 
+    /// 要求：`T`不能跨页存储
     #[inline]
     fn read_mut<T>(&mut self, va: VirtAddr) -> &'static mut T {
         self.translate_virt_addr(va).unwrap().as_mut()

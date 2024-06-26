@@ -5,6 +5,7 @@ use crate::memory::UserBuffer;
 use crate::sync::UpCell;
 use crate::task;
 
+#[derive(Debug)]
 pub struct Pipe {
     readable: bool,
     writable: bool,
@@ -103,10 +104,6 @@ impl File for Pipe {
                 }
             }
         }
-    }
-
-    fn stat(&self) -> easy_fs::Stat {
-        unimplemented!()
     }
 }
 

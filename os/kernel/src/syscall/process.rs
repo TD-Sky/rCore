@@ -38,21 +38,22 @@ pub fn sys_fork() -> isize {
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = processor::current_user_token();
     let path = memory::read_str(token, path);
+    log::info!("Executing: {path}");
 
     let mut arg_vec = Vec::new();
     loop {
         let arg = *memory::read_ref(token, args) as *const u8;
-        log::debug!("token={token} arg={arg:#p}");
         if arg.is_null() {
             break;
         }
+        log::debug!("token={token:#x} arg={arg:#p}");
         arg_vec.push(memory::read_str(token, arg));
         unsafe {
             args = args.add(1);
         }
     }
 
-    let Some(app) = fs::open_file(&path, OpenFlag::read_only()) else {
+    let Some(app) = fs::open(&path, OpenFlag::read_only()) else {
         return -1;
     };
 
@@ -70,7 +71,7 @@ pub fn sys_spawn(path: *const u8) -> isize {
     let token = processor::current_user_token();
     let path = memory::read_str(token, path);
 
-    let Some(app) = fs::open_file(&path, BitFlags::from_bits_truncate(OpenFlag::RDONLY)) else {
+    let Some(app) = fs::open(&path, BitFlags::from_bits_truncate(OpenFlag::RDONLY)) else {
         return -1;
     };
 

@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 /// 通用资源分配器
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RecycleAllocator {
     current: usize,
     recycled: Vec<usize>,

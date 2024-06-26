@@ -23,6 +23,7 @@ fn main() -> io::Result<()> {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(cli.out_dir.join("fs.img"))?;
         fd.set_len(16 * 2048 * 512).unwrap();
 
@@ -32,7 +33,7 @@ fn main() -> io::Result<()> {
     let efs = EasyFileSystem::new(block_file, 16 * 2048, 1);
     let root_inode = Arc::new(EasyFileSystem::root_inode(&efs));
 
-    let apps: io::Result<Vec<String>> = fs::read_dir(&cli.source)?
+    let apps = fs::read_dir(&cli.source)?
         .map(|app| {
             app.map(|app| {
                 app.file_name()
@@ -43,9 +44,9 @@ fn main() -> io::Result<()> {
                     .to_owned()
             })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
-    for app in apps? {
+    for app in apps {
         println!("program: {app:?}");
         let mut host_file = File::open(cli.target.join(&app))?;
         let mut elf_data: Vec<u8> = Vec::new();

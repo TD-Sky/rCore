@@ -6,9 +6,10 @@ use std::io::{Read, Write};
 use std::io::{Seek, SeekFrom};
 use std::sync::Mutex;
 
-use easy_fs::BlockDevice;
+use block_dev::BlockDevice;
 use easy_fs::BLOCK_SIZE;
 
+#[derive(Debug)]
 pub struct BlockFile(pub Mutex<File>);
 
 impl BlockDevice for BlockFile {

@@ -9,6 +9,7 @@ use crate::task::manager;
 use crate::task::processor;
 use crate::task::TaskControlBlock;
 
+#[derive(Debug)]
 pub struct Semaphore {
     permits: AtomicUsize,
     wait_queue: UpCell<VecDeque<Arc<TaskControlBlock>>>,

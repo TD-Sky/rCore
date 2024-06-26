@@ -14,7 +14,7 @@ use crate::trap::trap_return;
 //
 /// 任务上下文
 #[repr(C)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TaskContext {
     pub ra: usize,
     pub sp: usize,

@@ -1,6 +1,6 @@
 use alloc::collections::BTreeMap;
 
-use easy_fs::BlockDevice;
+use block_dev::BlockDevice;
 use virtio_drivers::{BlkResp, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use super::{IOMode, DEV_IO_MODE};
@@ -12,6 +12,15 @@ use crate::task::processor;
 pub struct VirtIOBlock {
     base: UpCell<VirtIOBlk<'static, VirtioHal>>,
     condvars: BTreeMap<u16, Condvar>,
+}
+
+impl core::fmt::Debug for VirtIOBlock {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VirtIOBlock")
+            .field("base", &"Virtio HAL")
+            .field("condvars", &self.condvars)
+            .finish()
+    }
 }
 
 // VirtIO 设备需要占用部分内存作为一个公共区域从而更好的和 CPU 进行合作。

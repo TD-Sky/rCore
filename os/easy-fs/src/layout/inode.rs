@@ -13,9 +13,9 @@
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use block_dev::BlockDevice;
 
 use crate::block_cache;
-use crate::BlockDevice;
 use crate::DataBlock;
 use crate::BLOCK_SIZE;
 

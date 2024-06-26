@@ -1,13 +1,14 @@
 use alloc::sync::Arc;
+use block_dev::BlockDevice;
 
 use crate::block_cache;
-use crate::BlockDevice;
 use crate::BLOCK_BITS;
 
 /// 位图区域内块的结构
 type BitmapBlock = [u64; BLOCK_BITS / 64];
 
 /// 位图区域，记录其指示区域的块分配情况
+#[derive(Debug)]
 pub struct Bitmap {
     /// 位图的起始块
     start_block_id: usize,
