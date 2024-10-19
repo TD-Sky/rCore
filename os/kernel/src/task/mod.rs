@@ -20,10 +20,10 @@ pub use self::{
 };
 
 use alloc::sync::Arc;
-use core::{mem, ptr};
-use spin::Lazy;
+use core::mem;
 
 use enumflags2::BitFlags;
+use spin::Lazy;
 
 use self::signal::SignalFlag;
 use crate::fs::open;
@@ -52,7 +52,7 @@ pub fn suspend_current_and_run_next() {
 
     let task_ctx_ptr = task.inner().exclusive_session(|task| {
         task.status = TaskStatus::Ready;
-        ptr::addr_of_mut!(task.ctx)
+        &raw mut task.ctx
     });
 
     manager::add_task(task);
@@ -63,7 +63,7 @@ pub fn block_current() -> *mut TaskContext {
     let task = processor::take_current_task().unwrap();
     let mut task_inner = task.inner().exclusive_access();
     task_inner.status = TaskStatus::Blocked;
-    ptr::addr_of_mut!(task_inner.ctx)
+    &raw mut task_inner.ctx
 }
 
 pub fn block_current_and_run_next() {
@@ -119,7 +119,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
     drop(process);
     let mut tmp_task_ctx = TaskContext::default();
-    processor::schedule(ptr::addr_of_mut!(tmp_task_ctx));
+    processor::schedule(&raw mut tmp_task_ctx);
 }
 
 pub fn send_signal_to_current(signal: SignalFlag) {

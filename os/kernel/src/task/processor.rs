@@ -1,7 +1,5 @@
 //! CPU状态管理
 
-use core::ptr;
-
 use alloc::sync::Arc;
 
 use super::ProcessControlBlock;
@@ -84,11 +82,11 @@ pub fn run() {
 
         // 直到取得预备的新任务
         if let Some(task) = manager::fetch_task() {
-            let idle_task_ctx_ptr = ptr::addr_of_mut!(processor.idle_task_ctx);
+            let idle_task_ctx_ptr = &raw mut processor.idle_task_ctx;
 
             let next_task_ctx_ptr = task.inner().exclusive_session(|task| {
                 task.status = TaskStatus::Running;
-                ptr::addr_of!(task.ctx)
+                &raw const task.ctx
             });
 
             processor.current = Some(task);
@@ -105,7 +103,7 @@ pub fn run() {
 /// 切换回 idle 控制流
 pub fn schedule(task_ctx_ptr: *mut TaskContext) {
     let idle_task_ctx_ptr =
-        PROCESSOR.exclusive_session(|processor| ptr::addr_of!(processor.idle_task_ctx));
+        PROCESSOR.exclusive_session(|processor| &raw const processor.idle_task_ctx);
 
     unsafe {
         __switch(task_ctx_ptr, idle_task_ctx_ptr);
