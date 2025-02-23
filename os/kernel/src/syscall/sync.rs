@@ -10,8 +10,7 @@ pub fn sys_mutex_create(block: bool) -> isize {
         Arc::new(SpinMutex::new())
     };
     let process = processor::current_process();
-    let mut process = process.inner().exclusive_access();
-    process.mutex_list.insert(mutex) as isize
+    process.inner().exclusive_access().mutex_list.insert(mutex) as isize
 }
 
 pub fn sys_mutex_lock(id: usize) -> isize {

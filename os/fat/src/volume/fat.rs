@@ -2,8 +2,8 @@ use core::mem;
 use core::ops::Range;
 
 use crate::volume::reserved::{self, Bpb, Media};
-use crate::{sector, SectorId};
 use crate::{ClusterError, ClusterId};
+use crate::{SectorId, sector};
 
 /// File Allocation Table
 #[derive(Debug)]

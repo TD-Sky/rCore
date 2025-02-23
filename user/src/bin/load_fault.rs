@@ -8,7 +8,7 @@
 use core::ptr::null;
 use user::println;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("\nload_fault APP running...\n");
     println!("Into Test load_fault, we will insert an invalid load operation...");

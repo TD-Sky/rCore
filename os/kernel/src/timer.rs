@@ -14,7 +14,7 @@ use riscv::register::time;
 use crate::config::CLOCK_FREQ;
 use crate::sbi::set_timer;
 use crate::sync::UpCell;
-use crate::task::{manager, TaskControlBlock};
+use crate::task::{TaskControlBlock, manager};
 
 const TICKS_PRE_SEC: usize = 100;
 const MILLISECONDS: usize = 1000;

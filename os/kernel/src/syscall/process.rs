@@ -6,10 +6,10 @@ use enumflags2::BitFlags;
 use crate::fs;
 use crate::fs::OpenFlag;
 use crate::memory;
+use crate::task::ProcessControlBlock;
 use crate::task::manager;
 use crate::task::processor;
 use crate::task::signal::SignalAction;
-use crate::task::ProcessControlBlock;
 
 pub fn sys_getpid() -> isize {
     processor::current_process().pid() as isize

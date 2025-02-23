@@ -26,7 +26,7 @@ fn line_start() {
     print!("{}# ", getcwd());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("Rust user shell");
     let mut line = String::new();
@@ -86,9 +86,8 @@ fn main() -> i32 {
                         }
 
                         /* 子进程 */
-                        if let Err(e) = sub_process(i, process_args, &pipes, end) {
-                            return e;
-                        }
+                        let Err(e) = sub_process(i, process_args, &pipes, end);
+                        return e;
                         /* 子进程exec */
                     }
 

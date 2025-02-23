@@ -5,7 +5,7 @@ use super::address::{PhysAddr, PhysPageNum};
 use crate::config::MEMORY_END;
 use crate::sync::UpCell;
 
-extern "C" {
+unsafe extern "C" {
     fn ekernel();
 }
 

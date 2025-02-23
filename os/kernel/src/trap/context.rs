@@ -5,8 +5,8 @@
 //! 并通 sret 让应用程序继续执行。
 
 use riscv::register::sstatus;
-use riscv::register::sstatus::Sstatus;
 use riscv::register::sstatus::SPP;
+use riscv::register::sstatus::Sstatus;
 
 // |  trap_handler |
 // |   kernel_sp   |

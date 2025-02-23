@@ -5,16 +5,16 @@ use core::mem;
 
 use enumflags2::BitFlags;
 
-use super::manager;
-use super::signal::SignalFlag;
 use super::RecycleAllocator;
 use super::TaskControlBlock;
+use super::manager;
+use super::signal::SignalFlag;
 use crate::collections::SlotVec;
-use crate::fs::stdio::{Stdin, Stdout};
 use crate::fs::File;
+use crate::fs::stdio::{Stdin, Stdout};
 use crate::memory::{self, AddressSpace, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UpCell};
-use crate::trap::{trap_handler, TrapContext};
+use crate::trap::{TrapContext, trap_handler};
 
 static PID_ALLOCATOR: UpCell<RecycleAllocator> = UpCell::new(RecycleAllocator::new());
 

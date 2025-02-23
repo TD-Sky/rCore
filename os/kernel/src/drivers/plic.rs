@@ -7,8 +7,8 @@ use riscv::register::sie;
 
 use super::{BLOCK_DEVICE, KEYBOARD_DEVICE, MOUSE_DEVICE, SERIAL};
 use crate::board::{
-    irq_ids, IrqId, MemMapEntity, PLIC_CONTEXT_BASE, PLIC_CONTEXT_STRIDE, PLIC_ENABLE_BASE,
-    PLIC_ENABLE_STRIDE,
+    IrqId, MemMapEntity, PLIC_CONTEXT_BASE, PLIC_CONTEXT_STRIDE, PLIC_ENABLE_BASE,
+    PLIC_ENABLE_STRIDE, irq_ids,
 };
 
 pub fn init_device() {

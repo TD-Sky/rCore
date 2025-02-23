@@ -4,8 +4,8 @@ use core::{ptr, slice};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use super::address::VirtAddr;
 use super::PageTable;
+use super::address::VirtAddr;
 
 /// 来自用户空间的缓冲区
 #[derive(Default)]

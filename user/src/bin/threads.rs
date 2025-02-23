@@ -29,7 +29,7 @@ pub fn thread_c() -> ! {
     exit(3)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let v = [
         user::thread::spawn(thread_a as usize, 0),

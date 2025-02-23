@@ -19,7 +19,7 @@ static TESTS: &[&str] = &[
     "yield",
 ];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     for test in TESTS {
         println!("Usertests: Running {test}");

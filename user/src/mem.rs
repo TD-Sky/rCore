@@ -3,7 +3,7 @@ use core::slice;
 
 use crate::syscall::*;
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 
 #[bitflags]
 #[repr(u8)]

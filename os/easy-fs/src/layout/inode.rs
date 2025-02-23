@@ -15,9 +15,9 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use block_dev::BlockDevice;
 
-use crate::block_cache;
-use crate::DataBlock;
 use crate::BLOCK_SIZE;
+use crate::DataBlock;
+use crate::block_cache;
 
 /// 间接索引块的编号容量
 const INDIRECT_COUNT: usize = BLOCK_SIZE / 4;

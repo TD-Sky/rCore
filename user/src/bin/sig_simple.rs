@@ -3,8 +3,8 @@
 #![feature(format_args_nl)]
 
 use user::process;
-use user::thread::exit;
 use user::signal::*;
+use user::thread::exit;
 
 #[macro_use]
 extern crate user;
@@ -14,7 +14,7 @@ fn func() {
     sigreturn();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let mut new = SignalAction::default();
     let mut old = SignalAction::default();

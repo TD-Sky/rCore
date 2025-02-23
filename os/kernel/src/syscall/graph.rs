@@ -1,7 +1,7 @@
 use crate::config::FRAMEBUFFER_VA;
 use crate::drivers::GPU_DEVICE;
-use crate::memory::address::{PhysAddr, VirtAddr};
 use crate::memory::MapPermission;
+use crate::memory::address::{PhysAddr, VirtAddr};
 use crate::task::processor;
 
 pub fn sys_framebuffer() -> isize {

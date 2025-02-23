@@ -8,7 +8,7 @@ extern crate user;
 use user::process::getpid;
 use user::thread::yield_;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("Hello, I am process {}.", getpid());
     for i in 0..5 {

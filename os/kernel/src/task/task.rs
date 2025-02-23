@@ -4,11 +4,11 @@ use alloc::sync::Weak;
 use super::ProcessControlBlock;
 use super::TaskContext;
 use crate::config::{PAGE_SIZE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::memory::KernelStack;
+use crate::memory::MapPermission;
 use crate::memory::address::PhysPageNum;
 use crate::memory::address::VirtAddr;
 use crate::memory::alloc_kernel_stack;
-use crate::memory::KernelStack;
-use crate::memory::MapPermission;
 use crate::sync::UpCell;
 use crate::trap::TrapContext;
 

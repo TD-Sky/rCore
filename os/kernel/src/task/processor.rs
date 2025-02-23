@@ -2,12 +2,12 @@
 
 use alloc::sync::Arc;
 
-use super::ProcessControlBlock;
 use super::__switch;
-use super::manager;
+use super::ProcessControlBlock;
 use super::TaskContext;
 use super::TaskControlBlock;
 use super::TaskStatus;
+use super::manager;
 use crate::sync::UpCell;
 use crate::trap::TrapContext;
 

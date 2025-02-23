@@ -19,16 +19,17 @@ pub use self::context::TrapContext;
 use core::arch::asm;
 use core::arch::global_asm;
 
+use riscv::interrupt::Exception;
+use riscv::interrupt::Interrupt;
 use riscv::register::mtvec::TrapMode;
 use riscv::register::scause;
-use riscv::register::scause::Exception;
-use riscv::register::scause::Interrupt;
 use riscv::register::scause::Trap;
 use riscv::register::sie;
 use riscv::register::sscratch;
 use riscv::register::sstatus;
 use riscv::register::stval;
 use riscv::register::stvec;
+use riscv::register::stvec::Stvec;
 
 use crate::board;
 use crate::config::TRAMPOLINE;
@@ -40,7 +41,7 @@ use crate::timer;
 
 global_asm!(include_str!("trap.S"));
 
-extern "C" {
+unsafe extern "C" {
     fn __alltraps();
     fn __alltraps_k();
     fn __restore();
@@ -53,7 +54,9 @@ pub fn init() {
 fn set_kernel_trap_entry() {
     let alltraps_k_va = TRAMPOLINE + (__alltraps_k as usize - __alltraps as usize);
     unsafe {
-        stvec::write(alltraps_k_va, TrapMode::Direct);
+        let mut stvec = Stvec::from_bits(alltraps_k_va);
+        stvec.set_trap_mode(TrapMode::Direct);
+        stvec::write(stvec);
         sscratch::write(trap_from_kernel as usize);
     }
 }
@@ -61,7 +64,9 @@ fn set_kernel_trap_entry() {
 /// 设置 stvec 为跳板地址
 fn set_user_trap_entry() {
     unsafe {
-        stvec::write(TRAMPOLINE, TrapMode::Direct);
+        let mut stvec = Stvec::from_bits(TRAMPOLINE);
+        stvec.set_trap_mode(TrapMode::Direct);
+        stvec::write(stvec);
     }
 }
 
@@ -81,7 +86,7 @@ pub fn enable_timer_interrupt() {
 }
 
 // 这个 TrapContext 是在汇编里手动构造的
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     // Supervisor Exception Casue
@@ -95,7 +100,7 @@ pub fn trap_handler() -> ! {
     // | _ => 0
     let stval = stval::read();
 
-    match cause {
+    match Trap::<Interrupt, Exception>::try_from(cause).unwrap() {
         Trap::Exception(Exception::UserEnvCall) => {
             // Trap上下文不在内核地址空间内，要间接获取
             let ctx = processor::current_trap_ctx();
@@ -152,7 +157,7 @@ pub fn trap_handler() -> ! {
 }
 
 /// 结束Trap处理环节，跳转到恢复函数
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn trap_return() -> ! {
     unsafe {
         sstatus::clear_sie();
@@ -185,19 +190,19 @@ pub fn trap_return() -> ! {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn trap_from_kernel() {
     let scause = scause::read();
     let stval = stval::read();
-    let casue = scause.cause();
+    let cause = scause.cause();
 
-    match casue {
+    match Trap::<Interrupt, Exception>::try_from(cause).unwrap() {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             timer::set_next_trigger();
             timer::wakeup_timeout_tasks();
             // 内核不做时间片轮换
         }
         Trap::Interrupt(Interrupt::SupervisorExternal) => board::irq_handler(),
-        _ => panic!("Unsupported trap from kernel: {casue:?}, stval = {stval:#x}"),
+        _ => panic!("Unsupported trap from kernel: {cause:?}, stval = {stval:#x}"),
     }
 }

@@ -10,7 +10,7 @@ use user::thread::{exit, yield_};
 
 const MAGIC: i32 = -0x10384;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("I am the parent. Forking the child...");
     let pid = fork();

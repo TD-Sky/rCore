@@ -9,8 +9,8 @@ use super::address::VirtPageNum;
 use super::frame_allocator;
 use super::frame_allocator::Frame;
 
-use enumflags2::bitflags;
 use enumflags2::BitFlags;
+use enumflags2::bitflags;
 
 #[derive(Debug)]
 pub struct PageTable {

@@ -8,7 +8,7 @@ mod input;
 mod plic;
 
 pub use self::{
-    block::{IOMode, BLOCK_DEVICE, DEV_IO_MODE},
+    block::{BLOCK_DEVICE, DEV_IO_MODE, IOMode},
     chardev::SERIAL,
     gpu::GPU_DEVICE,
     input::{KEYBOARD_DEVICE, MOUSE_DEVICE},

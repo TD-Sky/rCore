@@ -6,10 +6,10 @@
 extern crate user;
 
 use enumflags2::BitFlags;
-use user::fs::{close, open, OpenFlag};
+use user::fs::{OpenFlag, close, open};
 use user::io::{read, write};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let test_str = "Hello, world!";
     let filea = "filea";

@@ -7,7 +7,7 @@ use user::process::{spawn, waitpid};
 #[macro_use]
 extern crate user;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let child = "matrix";
     let sub_pid = spawn(child).unwrap();

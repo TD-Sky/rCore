@@ -10,11 +10,11 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Write;
 
-use user::fs::{close, getdents, open, OpenFlag};
+use user::fs::{OpenFlag, close, getdents, open};
 use user::println;
 use vfs::{CDirEntry, DirEntryType};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main(_: usize, argv: &[&str]) -> i32 {
     let path = argv.get(1).copied().unwrap_or(".");
 

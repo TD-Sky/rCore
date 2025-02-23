@@ -1,5 +1,5 @@
 use core::arch::asm;
-use core::ffi::{c_char, CStr};
+use core::ffi::{CStr, c_char};
 
 use vfs::{CDirEntry, Stat};
 

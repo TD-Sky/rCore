@@ -2,10 +2,10 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 
 use crate::task;
-use crate::task::manager;
-use crate::task::processor;
 use crate::task::TaskContext;
 use crate::task::TaskControlBlock;
+use crate::task::manager;
+use crate::task::processor;
 
 use super::Mutex;
 use super::UpCell;

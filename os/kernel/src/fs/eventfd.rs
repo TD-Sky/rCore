@@ -2,16 +2,16 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use core::sync::atomic;
 use core::sync::atomic::AtomicU64;
-use enumflags2::bitflags;
 use enumflags2::BitFlags;
+use enumflags2::bitflags;
 
 use super::File;
 use crate::memory::UserBuffer;
 use crate::sync::UpCell;
 use crate::task;
+use crate::task::TaskControlBlock;
 use crate::task::manager;
 use crate::task::processor;
-use crate::task::TaskControlBlock;
 
 #[allow(clippy::upper_case_acronyms)]
 #[bitflags]

@@ -4,7 +4,7 @@
 use embedded_graphics::prelude::Size;
 use user::graph::{Display, RESOLUTION_X, RESOLUTION_Y};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let mut display = Display::new(Size::new(RESOLUTION_X, RESOLUTION_Y));
     display.paint(|fb| {

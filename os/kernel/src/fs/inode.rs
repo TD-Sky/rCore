@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use core::mem;
 use core::ptr;
 
-use enumflags2::bitflags;
 use enumflags2::BitFlags;
+use enumflags2::bitflags;
 use fat::FatFileSystem;
 use fat::Inode;
 use fat::ROOT;

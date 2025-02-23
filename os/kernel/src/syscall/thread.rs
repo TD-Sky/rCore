@@ -2,13 +2,13 @@ use alloc::sync::Arc;
 
 use crate::memory;
 use crate::task;
+use crate::task::TaskControlBlock;
 use crate::task::manager;
 use crate::task::processor;
-use crate::task::TaskControlBlock;
 use crate::timer;
 use crate::timer::TimerCondVar;
-use crate::trap::trap_handler;
 use crate::trap::TrapContext;
+use crate::trap::trap_handler;
 
 // 切换任务，用户模式的上下文依旧是由 trap_handler 保存
 pub fn sys_yield() -> isize {

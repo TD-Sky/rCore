@@ -83,7 +83,7 @@ impl core::ops::Add<usize> for SectorId {
 }
 
 impl Step for SectorId {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
         usize::steps_between(&start.0, &end.0)
     }
 

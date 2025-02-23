@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 use block_dev::BlockDevice;
 use virtio_drivers::{BlkResp, RespStatus, VirtIOBlk, VirtIOHeader};
 
-use super::{IOMode, DEV_IO_MODE};
+use super::{DEV_IO_MODE, IOMode};
 use crate::board::IrqId;
 use crate::drivers::bus::VirtioHal;
 use crate::sync::{Condvar, UpCell};

@@ -3,10 +3,9 @@ use alloc::vec::Vec;
 use virtio_drivers::Hal;
 
 use crate::memory::{
-    self,
+    self, PageTable,
     address::PhysAddr,
     frame_allocator::{self, Frame},
-    PageTable,
 };
 use crate::sync::UpCell;
 

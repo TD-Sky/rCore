@@ -1,7 +1,7 @@
 use core::panic::PanicInfo;
 
 use crate::process::getpid;
-use crate::signal::{kill, SIGABRT};
+use crate::signal::{SIGABRT, kill};
 
 #[panic_handler]
 fn panic_handler(panic_info: &PanicInfo) -> ! {

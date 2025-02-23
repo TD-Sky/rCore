@@ -8,8 +8,8 @@ use core::iter::Step;
 use core::ops::{Add, AddAssign, Shl};
 use core::slice;
 
-use super::page_table;
 use super::PageTable;
+use super::page_table;
 
 /// satp的模式字段值为8时，会启用SV39分页模式
 const SV39_MODE_MASK: usize = 0b1000 << 60;
@@ -88,7 +88,7 @@ impl core::fmt::Debug for VirtPageNum {
 
 // 实现了就能用 Range<VirtPageNum> 迭代了
 impl Step for VirtPageNum {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
         usize::steps_between(&start.0, &end.0)
     }
 

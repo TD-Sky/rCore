@@ -1,8 +1,8 @@
 //! 内核空间的用户内核栈
 
-use super::address::VirtAddr;
-use super::MapPermission;
 use super::KERNEL_SPACE;
+use super::MapPermission;
+use super::address::VirtAddr;
 use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE};
 use crate::sync::UpCell;
 use crate::task::RecycleAllocator;

@@ -5,9 +5,9 @@ use core::sync::atomic::AtomicUsize;
 
 use super::UpCell;
 use crate::task;
+use crate::task::TaskControlBlock;
 use crate::task::manager;
 use crate::task::processor;
-use crate::task::TaskControlBlock;
 
 #[derive(Debug)]
 pub struct Semaphore {

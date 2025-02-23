@@ -6,13 +6,13 @@
 extern crate user;
 
 use user::process::*;
-use user::thread::sleep;
 use user::thread::exit;
+use user::thread::sleep;
 use user::time::get_time;
 
 static NUM: usize = 30;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     for _ in 0..NUM {
         let pid = fork();

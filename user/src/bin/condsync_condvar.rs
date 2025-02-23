@@ -12,7 +12,7 @@ use user::sync::{
 };
 use user::thread::{exit, sleep, waittid};
 
-static mut A: usize = 0;
+static A: usize = 0;
 
 const CONDVAR_ID: usize = 0;
 const MUTEX_ID: usize = 0;
@@ -21,7 +21,9 @@ unsafe fn first() -> ! {
     sleep(10);
     println!("First work, Change A --> 1 and wakeup Second");
     mutex_lock(MUTEX_ID);
-    A = 1;
+    unsafe {
+        (&raw const A).cast_mut().write(1);
+    }
     condvar_signal(CONDVAR_ID);
     mutex_unlock(MUTEX_ID);
     exit(0)
@@ -33,15 +35,15 @@ unsafe fn second() -> ! {
     // Mesa语义的实现，中间可能存在其它竞争线程，
     // 因此即使等待完成，条件也不一定满足
     while A == 0 {
-        println!("Second: A is {}", A);
+        println!("Second: A is {A}");
         condvar_wait(CONDVAR_ID, MUTEX_ID);
     }
-    println!("A is {}, Second can work now", A);
+    println!("A is {A}, Second can work now");
     mutex_unlock(MUTEX_ID);
     exit(0)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     // create condvar & mutex
     assert_eq!(condvar_create(), CONDVAR_ID);

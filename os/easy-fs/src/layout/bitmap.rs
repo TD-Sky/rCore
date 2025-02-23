@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 use block_dev::BlockDevice;
 
-use crate::block_cache;
 use crate::BLOCK_BITS;
+use crate::block_cache;
 
 /// 位图区域内块的结构
 type BitmapBlock = [u64; BLOCK_BITS / 64];

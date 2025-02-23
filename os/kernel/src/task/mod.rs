@@ -26,8 +26,8 @@ use enumflags2::BitFlags;
 use spin::Lazy;
 
 use self::signal::SignalFlag;
-use crate::fs::open;
 use crate::fs::OpenFlag;
+use crate::fs::open;
 use crate::sbi::shutdown;
 
 const IDLE_PID: usize = 0;

@@ -1,5 +1,5 @@
 use crate::volume::reserved::Bpb;
-use crate::{sector, SectorId};
+use crate::{SectorId, sector};
 
 /// # 文件系统信息
 ///

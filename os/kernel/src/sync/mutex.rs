@@ -6,9 +6,9 @@ use core::sync::atomic::AtomicBool;
 
 use super::UpCell;
 use crate::task;
+use crate::task::TaskControlBlock;
 use crate::task::manager;
 use crate::task::processor;
-use crate::task::TaskControlBlock;
 
 pub trait Mutex: Debug + Send + Sync {
     fn lock(&self);

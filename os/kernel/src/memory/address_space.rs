@@ -122,24 +122,24 @@ use core::arch::riscv64;
 use core::ops::Range;
 use spin::Lazy;
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 use goblin::elf::Elf;
 use goblin::elf64::program_header::PT_LOAD;
 use goblin::elf64::program_header::{PF_R, PF_W, PF_X};
-use riscv::register::satp;
+use riscv::register::satp::{self, Satp};
 
+use super::PageTable;
 use super::address::*;
 use super::frame_allocator;
 use super::frame_allocator::Frame;
 use super::page_table;
 use super::page_table::PTEFlag;
 use super::page_table::{MappedVpn, UnmappedVpn};
-use super::PageTable;
 use crate::board::mmio_segments;
 use crate::config::{MEMORY_END, PAGE_SIZE, TRAMPOLINE};
 use crate::sync::UpCell;
 
-extern "C" {
+unsafe extern "C" {
     fn stext();
     fn etext();
     fn srodata();
@@ -509,8 +509,10 @@ impl AddressSpace {
     }
 
     pub fn activate(&self) {
-        let satp = self.page_table.token();
-        satp::write(satp);
+        let satp = Satp::from_bits(self.page_table.token());
+        unsafe {
+            satp::write(satp);
+        }
         // 快表 TLB 会缓存虚拟页号到页表项的映射，
         // 但它与地址空间耦合，
         // 改动 satp 的值即切换地址空间会导致

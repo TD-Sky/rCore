@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(linkage)]
-#![feature(panic_info_message)]
 #![feature(never_type)]
 #![feature(format_args_nl)]
 
@@ -28,13 +27,13 @@ use core::slice;
 /// 分配的堆空间
 const USER_HEAP_SIZE: usize = 2usize.pow(20);
 
-static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
+static HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 #[global_allocator]
 static HEAP: LockedHeap<32> = LockedHeap::empty();
 
-#[no_mangle]
-#[link_section = ".text.entry"]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".text.entry")]
 pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
     unsafe {
         HEAP.lock()
@@ -57,7 +56,7 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
 
 // 弱链接会让编译器优先去 bin 目录寻找 main 。
 // 若没找到，就链接此 main ，但运行时会立马报错。
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "weak"]
 fn main(_argc: usize, _argv: &[&str]) -> i32 {
     panic!("Cannot find main!");

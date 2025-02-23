@@ -10,7 +10,7 @@ use user::thread::exit;
 
 const MAX_CHILD: usize = 30;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     for i in 0..MAX_CHILD {
         let pid = fork();

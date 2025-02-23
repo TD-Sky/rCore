@@ -4,7 +4,7 @@ use alloc::vec;
 use core::cmp::Ordering;
 use core::mem::MaybeUninit;
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 use vfs::{CDirEntry, Stat};
 
 use crate::io::{read, write};

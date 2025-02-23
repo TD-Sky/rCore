@@ -8,9 +8,9 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem;
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 
-use crate::{sector, ClusterId};
+use crate::{ClusterId, sector};
 
 static CWD_NAME: [u8; 11] = {
     let mut arr = [0; 11];
@@ -48,7 +48,7 @@ impl DirEntry {
     ///
     /// 通过属性才能知晓目录项属于短还是长。
     pub unsafe fn attr(&self) -> BitFlags<AttrFlag> {
-        self.short.attr
+        unsafe { self.short.attr }
     }
 }
 

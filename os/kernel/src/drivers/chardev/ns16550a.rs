@@ -6,7 +6,7 @@
 
 use crate::ptr::volatile::*;
 use alloc::collections::VecDeque;
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 
 use crate::{
     sync::{Condvar, UpCell},

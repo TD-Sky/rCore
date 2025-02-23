@@ -8,7 +8,7 @@ extern crate alloc;
 extern crate user;
 use user::fs::getcwd;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let cwd = getcwd();
     println!("{cwd}");

@@ -12,7 +12,7 @@ use crate::volume::{
     fat::Fat,
     reserved::{Bpb, FsInfo},
 };
-use crate::{sector, ClusterId, SectorId};
+use crate::{ClusterId, SectorId, sector};
 
 #[derive(Debug)]
 pub struct FatFileSystem {

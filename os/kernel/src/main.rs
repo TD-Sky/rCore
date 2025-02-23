@@ -1,13 +1,11 @@
 #![no_std]
 #![no_main]
-#![feature(panic_info_message)]
 #![feature(slice_from_ptr_range)]
 #![feature(const_trait_impl)]
 #![feature(step_trait)]
 #![feature(format_args_nl)]
 #![feature(riscv_ext_intrinsics)]
 #![feature(let_chains)]
-#![feature(const_binary_heap_constructor)]
 #![feature(maybe_uninit_as_bytes)]
 
 extern crate alloc;
@@ -40,11 +38,11 @@ use core::slice;
 
 use spin::Lazy;
 
-use crate::drivers::{IOMode, DEV_IO_MODE, GPU_DEVICE, KEYBOARD_DEVICE, MOUSE_DEVICE, SERIAL};
+use crate::drivers::{DEV_IO_MODE, GPU_DEVICE, IOMode, KEYBOARD_DEVICE, MOUSE_DEVICE, SERIAL};
 
 global_asm!(include_str!("entry.S"));
 
-extern "C" {
+unsafe extern "C" {
     fn sbss();
     fn ebss();
 }
@@ -55,7 +53,7 @@ fn clear_bss() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn rust_main() -> ! {
     clear_bss();
     logging::init();

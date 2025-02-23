@@ -41,7 +41,7 @@ fn reader(arg: *const ReadArg) {
     exit(0);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let fd = eventfd(0, BitFlags::empty()).unwrap();
     let seq = &[1, 3, 7, 9, 14];

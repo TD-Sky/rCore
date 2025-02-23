@@ -6,7 +6,7 @@ use user::println;
 use user::process::{exec, fork, wait};
 use user::thread::yield_;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     if fork() == 0 {
         // 启动shell

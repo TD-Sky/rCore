@@ -4,11 +4,11 @@
 
 #[macro_use]
 extern crate user;
-use user::fs::{close, open, OpenFlag};
+use user::fs::{OpenFlag, close, open};
 use user::io::write;
 use user::time::get_time;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     let mut buffer = [0u8; 1024]; // 1KiB
     for (i, ch) in buffer.iter_mut().enumerate() {

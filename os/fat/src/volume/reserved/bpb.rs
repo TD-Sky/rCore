@@ -1,4 +1,4 @@
-use core::num::{NonZero, NonZeroU16, NonZeroU32, NonZeroU8};
+use core::num::{NonZero, NonZeroU8, NonZeroU16, NonZeroU32};
 
 use crate::SectorId;
 

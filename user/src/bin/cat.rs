@@ -5,10 +5,10 @@ extern crate alloc;
 
 #[macro_use]
 extern crate user;
-use user::fs::{close, open, OpenFlag};
+use user::fs::{OpenFlag, close, open};
 use user::io::read;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main(argc: usize, argv: &[&str]) -> i32 {
     assert!(argc == 2);
     let fd = open(argv[1], OpenFlag::read_only()).expect("Error occured when opening file");

@@ -4,7 +4,7 @@ use core::mem;
 use vfs::{DirEntryType, Stat};
 
 use crate::volume::data::*;
-use crate::{sector, ClusterId, FatFileSystem, SectorId};
+use crate::{ClusterId, FatFileSystem, SectorId, sector};
 
 pub static ROOT: Inode = Inode {
     start_id: ClusterId::MIN,

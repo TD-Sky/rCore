@@ -6,7 +6,7 @@ use user::println;
 use user::thread::sleep;
 use user::time::get_time;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn main() -> i32 {
     println!("into sleep test!");
     let start = get_time();
